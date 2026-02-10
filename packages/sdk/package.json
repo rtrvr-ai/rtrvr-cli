@@ -1,0 +1,31 @@
+{
+  "name": "@rtrvr-ai/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for rtrvr APIs (/agent, /scrape, /mcp)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "lint": "echo 'No lint configured for @rtrvr-ai/sdk'"
+  },
+  "dependencies": {
+    "@rtrvr-ai/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.18.8"
+  }
+}

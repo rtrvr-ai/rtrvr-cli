@@ -1,0 +1,36 @@
+{
+  "name": "@rtrvr-ai/cli",
+  "version": "0.1.0",
+  "description": "Official RTRVR CLI for /agent, /scrape, and /mcp",
+  "type": "module",
+  "bin": {
+    "rtrvr": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm run build && node --test test/*.test.mjs",
+    "lint": "echo 'No lint configured for @rtrvr-ai/cli'"
+  },
+  "dependencies": {
+    "@rtrvr-ai/sdk": "workspace:*",
+    "commander": "^14.0.1",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.18.8"
+  }
+}
