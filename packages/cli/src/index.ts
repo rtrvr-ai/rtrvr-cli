@@ -275,13 +275,8 @@ function registerExecutionCommands(root: Command): void {
       const { config, client, auth } = await loadAuthedClient();
       const token = auth.token as string;
       const requestedMode = request.target ?? config.defaultTarget;
-      const prefersExtension = request.preferExtension ?? config.preferExtensionByDefault;
-      const requireLocalSession = Boolean(request.requireLocalSession);
-      const explicitDeviceSelection = typeof request.deviceId === 'string' && request.deviceId.trim().length > 0;
-      const requiresCloudToken = requestedMode === 'cloud'
-        || (requestedMode !== 'extension' && !prefersExtension && !requireLocalSession && !explicitDeviceSelection);
-      if (requiresCloudToken) {
-        assertCloudTokenForCloudEndpoints(token, '`rtrvr run` (cloud/auto mode)');
+      if (requestedMode === 'cloud') {
+        assertCloudTokenForCloudEndpoints(token, '`rtrvr run` (cloud mode)');
       }
 
       const streamMode = options.stream ? resolveStreamModeForRequest(request, config) : undefined;
@@ -333,13 +328,8 @@ function registerExecutionCommands(root: Command): void {
       const { config, client, auth } = await loadAuthedClient();
       const token = auth.token as string;
       const requestedMode = request.target ?? config.defaultTarget;
-      const prefersExtension = request.preferExtension ?? config.preferExtensionByDefault;
-      const requireLocalSession = Boolean(request.requireLocalSession);
-      const explicitDeviceSelection = typeof request.deviceId === 'string' && request.deviceId.trim().length > 0;
-      const requiresCloudToken = requestedMode === 'cloud'
-        || (requestedMode !== 'extension' && !prefersExtension && !requireLocalSession && !explicitDeviceSelection);
-      if (requiresCloudToken) {
-        assertCloudTokenForCloudEndpoints(token, '`rtrvr agent` (cloud/auto mode)');
+      if (requestedMode === 'cloud') {
+        assertCloudTokenForCloudEndpoints(token, '`rtrvr agent` (cloud mode)');
       }
 
       const streamMode = options.stream ? resolveStreamModeForRequest(request, config) : undefined;
@@ -388,13 +378,8 @@ function registerExecutionCommands(root: Command): void {
       const { config, client, auth } = await loadAuthedClient();
       const target = resolveTargetSelection(options.target, options.cloud, options.extension);
       const requestedMode = target ?? config.defaultTarget;
-      const prefersExtension = options.preferExtension ?? config.preferExtensionByDefault;
-      const requireLocalSession = Boolean(options.requireLocalSession);
-      const explicitDeviceSelection = typeof options.deviceId === 'string' && options.deviceId.trim().length > 0;
-      const requiresCloudToken = requestedMode === 'cloud'
-        || (requestedMode !== 'extension' && !prefersExtension && !requireLocalSession && !explicitDeviceSelection);
-      if (requiresCloudToken) {
-        assertCloudTokenForCloudEndpoints(auth.token as string, '`rtrvr scrape` (cloud/auto mode)');
+      if (requestedMode === 'cloud') {
+        assertCloudTokenForCloudEndpoints(auth.token as string, '`rtrvr scrape` (cloud mode)');
       }
       const request: StreamableUnifiedScrapeRequest = {
         urls: options.url,
@@ -1398,20 +1383,8 @@ function resolveStreamModeForRequest(request: UnifiedRunRequest, config: CliConf
   if (requestedMode === 'cloud') {
     return 'cloud';
   }
-  if (requestedMode === 'extension') {
-    return 'extension';
-  }
-
-  if (typeof request.deviceId === 'string' && request.deviceId.trim().length > 0) {
-    return 'extension';
-  }
-
-  if (request.requireLocalSession) {
-    return 'extension';
-  }
-
-  const preferExtension = request.preferExtension ?? config.preferExtensionByDefault;
-  return preferExtension ? 'extension' : 'cloud';
+  // Auto mode checks for extension devices at runtime
+  return 'extension';
 }
 
 function resolveStreamModeForScrapeRequest(request: UnifiedScrapeRequest, config: CliConfig): 'cloud' | 'extension' {
@@ -1419,20 +1392,8 @@ function resolveStreamModeForScrapeRequest(request: UnifiedScrapeRequest, config
   if (requestedMode === 'cloud') {
     return 'cloud';
   }
-  if (requestedMode === 'extension') {
-    return 'extension';
-  }
-
-  if (typeof request.deviceId === 'string' && request.deviceId.trim().length > 0) {
-    return 'extension';
-  }
-
-  if (request.requireLocalSession) {
-    return 'extension';
-  }
-
-  const preferExtension = request.preferExtension ?? config.preferExtensionByDefault;
-  return preferExtension ? 'extension' : 'cloud';
+  // Auto mode checks for extension devices at runtime
+  return 'extension';
 }
 
 function prepareStreamRequest(request: UnifiedRunRequest): { trajectoryId: string; phase: number } {

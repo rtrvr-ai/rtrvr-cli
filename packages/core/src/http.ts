@@ -102,8 +102,9 @@ export class HttpClient {
         throw error;
       }
 
+      const baseMsg = error instanceof Error ? error.message : 'Unknown network error';
       throw new RtrvrError(
-        error instanceof Error ? error.message : 'Unknown network error',
+        `${baseMsg} (url: ${options.url})`,
         { cause: error },
       );
     } finally {

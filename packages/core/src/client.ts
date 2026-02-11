@@ -138,7 +138,6 @@ export class RtrvrClient {
 
     const requireLocalSession = request.requireLocalSession ?? false;
     const explicitDeviceSelection = hasRequestedDevice(request.deviceId);
-    const preferExtension = request.preferExtension ?? this.preferExtensionByDefault;
 
     if (requireLocalSession || explicitDeviceSelection) {
       let devices: DeviceListResult | undefined;
@@ -173,43 +172,29 @@ export class RtrvrClient {
       };
     }
 
-    if (preferExtension) {
-      const devices = await this.listDevices();
-      if (devices.online) {
-        try {
-          const routed = await this.extensionScrapeRun(request);
-          return {
-            metadata: {
-              selectedMode: routed.selectedMode,
-              requestedMode,
-              fallbackApplied: routed.selectedMode !== 'extension',
-              fallbackReason: routed.fallbackReason,
-              deviceId: request.deviceId ?? devices.devices[0]?.deviceId,
-              requestId: routed.requestId,
-              attempt: routed.attempt,
-            },
-            data: routed.data,
-          };
-        } catch (error) {
-          if (!isNoDeviceError(error)) {
-            throw error;
-          }
+    // Auto mode: check for online extension devices, use if available, fall back to cloud
+    const devices = await this.listDevices();
+    if (devices.online) {
+      try {
+        const routed = await this.extensionScrapeRun(request);
+        return {
+          metadata: {
+            selectedMode: routed.selectedMode,
+            requestedMode,
+            fallbackApplied: routed.selectedMode !== 'extension',
+            fallbackReason: routed.fallbackReason,
+            deviceId: request.deviceId ?? devices.devices[0]?.deviceId,
+            requestId: routed.requestId,
+            attempt: routed.attempt,
+          },
+          data: routed.data,
+        };
+      } catch (error) {
+        if (!isNoDeviceError(error)) {
+          throw error;
         }
+        // Extension device became unavailable, fall through to cloud
       }
-
-      const data = await this.scrapeRun(request);
-      const responseMeta = extractResponseMeta(data);
-      return {
-        metadata: {
-          selectedMode: 'cloud',
-          requestedMode,
-          fallbackApplied: true,
-          fallbackReason: 'No online extension devices found. Routed to cloud /scrape.',
-          requestId: responseMeta.requestId,
-          attempt: responseMeta.attempt,
-        },
-        data,
-      };
     }
 
     const data = await this.scrapeRun(request);
@@ -218,7 +203,10 @@ export class RtrvrClient {
       metadata: {
         selectedMode: 'cloud',
         requestedMode,
-        fallbackApplied: false,
+        fallbackApplied: devices.online,
+        fallbackReason: devices.online
+          ? 'Extension device became unavailable during execution. Routed to cloud /scrape.'
+          : undefined,
         requestId: responseMeta.requestId,
         attempt: responseMeta.attempt,
       },
@@ -252,11 +240,13 @@ export class RtrvrClient {
 
   private async toolRunWithMetadata(request: ToolRequest): Promise<ToolRunWithMetadata> {
     const tool = normalizeToolName(request.tool);
-    const payload = {
+    const payload: Record<string, unknown> = {
       tool,
       params: request.params ?? {},
-      deviceId: request.deviceId,
     };
+    if (request.deviceId) {
+      payload.deviceId = request.deviceId;
+    }
 
     const response = await this.http.requestJson<DirectApiResponse<unknown>>({
       url: this.mcpBaseUrl,
@@ -356,7 +346,6 @@ export class RtrvrClient {
 
     const requireLocalSession = request.requireLocalSession ?? false;
     const explicitDeviceSelection = hasRequestedDevice(request.deviceId);
-    const preferExtension = request.preferExtension ?? this.preferExtensionByDefault;
 
     if (requireLocalSession || explicitDeviceSelection) {
       let devices: DeviceListResult | undefined;
@@ -384,56 +373,28 @@ export class RtrvrClient {
       };
     }
 
-    if (preferExtension) {
-      const devices = await this.listDevices();
-      if (devices.online) {
-        try {
-          const routed = await this.extensionPlannerRunWithMetadata(toExtensionPlannerRequest(request));
-          return {
-            metadata: {
-              selectedMode: 'extension',
-              requestedMode,
-              fallbackApplied: false,
-              deviceId: request.deviceId ?? devices.devices[0]?.deviceId,
-              requestId: routed.requestId,
-              attempt: routed.attempt,
-            },
-            data: routed.data,
-          };
-        } catch (error) {
-          if (!isNoDeviceError(error)) {
-            throw error;
-          }
-
-          const data = await this.agentRun(toAgentRequest(request));
-          const responseMeta = extractResponseMeta(data);
-          return {
-            metadata: {
-              selectedMode: 'cloud',
-              requestedMode,
-              fallbackApplied: true,
-              fallbackReason: 'Extension device became unavailable during execution.',
-              requestId: responseMeta.requestId,
-              attempt: responseMeta.attempt,
-            },
-            data,
-          };
+    // Auto mode: check for online extension devices, use if available, fall back to cloud
+    const devices = await this.listDevices();
+    if (devices.online) {
+      try {
+        const routed = await this.extensionPlannerRunWithMetadata(toExtensionPlannerRequest(request));
+        return {
+          metadata: {
+            selectedMode: 'extension',
+            requestedMode,
+            fallbackApplied: false,
+            deviceId: request.deviceId ?? devices.devices[0]?.deviceId,
+            requestId: routed.requestId,
+            attempt: routed.attempt,
+          },
+          data: routed.data,
+        };
+      } catch (error) {
+        if (!isNoDeviceError(error)) {
+          throw error;
         }
+        // Extension device became unavailable, fall through to cloud
       }
-
-      const data = await this.agentRun(toAgentRequest(request));
-      const responseMeta = extractResponseMeta(data);
-      return {
-        metadata: {
-          selectedMode: 'cloud',
-          requestedMode,
-          fallbackApplied: true,
-          fallbackReason: 'No online extension devices found. Routed to cloud /agent.',
-          requestId: responseMeta.requestId,
-          attempt: responseMeta.attempt,
-        },
-        data,
-      };
     }
 
     const data = await this.agentRun(toAgentRequest(request));
@@ -442,7 +403,10 @@ export class RtrvrClient {
       metadata: {
         selectedMode: 'cloud',
         requestedMode,
-        fallbackApplied: false,
+        fallbackApplied: devices.online,
+        fallbackReason: devices.online
+          ? 'Extension device became unavailable during execution. Routed to cloud /agent.'
+          : undefined,
         requestId: responseMeta.requestId,
         attempt: responseMeta.attempt,
       },
