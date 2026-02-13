@@ -1,238 +1,320 @@
 # rtrvr CLI + SDK
 
-Unified CLI + SDK for rtrvr.ai, built for both humans and agentic runtimes.
+[![npm version](https://img.shields.io/npm/v/@rtrvr-ai/cli)](https://www.npmjs.com/package/@rtrvr-ai/cli)
+[![npm downloads](https://img.shields.io/npm/dm/@rtrvr-ai/cli)](https://www.npmjs.com/package/@rtrvr-ai/cli)
+[![license](https://img.shields.io/npm/l/@rtrvr-ai/cli)](LICENSE)
 
-## What this ships
+Browser automation for AI agents and humans. One CLI, three execution modes: cloud, local browser extension, or auto-routed.
 
-- `@rtrvr-ai/cli` (`rtrvr` binary)
-- `@rtrvr-ai/sdk` (TypeScript SDK)
-- `@rtrvr-ai/core` (routing, auth, and transport primitives)
+- **Cloud mode** — run agents and scrape pages via rtrvr's cloud infrastructure
+- **Extension mode** — route to your local browser extension for authenticated sessions
+- **Auto mode** — smart routing with automatic fallback between cloud and extension
 
-## Endpoint architecture
-
-- Control plane (CLI auth/profile/capabilities): `https://cli.rtrvr.ai`
-- Execution data plane (MCP + execution events): `https://mcp.rtrvr.ai`
-- Cloud automation plane (`/agent`, `/scrape`): `https://api.rtrvr.ai`
-
-## Install (local dev)
+## Install
 
 ```bash
-pnpm install
-pnpm build
-node packages/cli/dist/index.js --help
+# CLI (global)
+npm install -g @rtrvr-ai/cli
+
+# SDK (in your project)
+npm install @rtrvr-ai/sdk
 ```
 
-## CLI quickstart
+## Quick Start
 
 ```bash
-rtrvr auth login --oauth
-rtrvr run "Extract top 10 products and prices" --url https://example.com --target auto
-rtrvr agent --input "Visit the URL and return a structured summary" --url https://example.com
-rtrvr scrape --url https://example.com --target auto
-rtrvr profile
+# Authenticate
+rtrvr auth login
+
+# Run an AI agent task
+rtrvr run "Extract the top 10 products and prices" --url https://example.com
+
+# Scrape a page
+rtrvr scrape --url https://example.com
+
+# Check what you can do
 rtrvr capabilities
+
+# Diagnose connectivity
 rtrvr doctor
 ```
 
-## Command model
-
-- High-level commands: `run`, `agent`, `scrape`
-- Introspection: `profile`, `capabilities`, `doctor`, `debug:endpoints`
-- Auth: `auth login`, `auth status`, `auth logout`
-- Skills: `skills add|list|show|validate|apply|export|templates`
-- MCP setup: `mcp init`
-
-### Input sources (`run`/`agent`)
-
-Exactly one explicit source at a time:
-
-- positional: `rtrvr run "task"`
-- inline: `rtrvr run --input "task"`
-- file: `rtrvr run --input-file ./task.txt`
-- stdin: `echo "task" | rtrvr run`
-- explicit stdin: `rtrvr run --input -`
-
-## Routing behavior
-
-Canonical selector:
-
-- `--target auto|cloud|extension`
-
-Fast selectors:
-
-- `--cloud` and `--extension`
-
-Behavior:
-
-- `run`/`agent` with `target=cloud` routes to cloud `/agent`
-- `run`/`agent` with `target=extension` routes to extension `planner` via MCP/direct API
-- `scrape` with `target=extension` uses extension `scrape`
-- `target=auto` uses configured defaults + availability/fallback logic
-
-## Response model
-
-- Default output is human-readable text.
-- Use `--json` for strict machine parsing.
-- Streaming is best-effort progress only; final output comes from the main response.
-
-## Auth model
-
-### Tokens
-
-- `rtrvr_...` API keys: full cloud + CLI control endpoints
-- `mcp_at_...` tokens: MCP/OAuth endpoint usage only
+## Authentication
 
 ### Login methods
 
-- OAuth bootstrap: `rtrvr auth login --oauth`
-- Direct API key: `rtrvr auth login --api-key rtrvr_...`
+```bash
+# Browser-based OAuth (recommended)
+rtrvr auth login --oauth
+
+# Direct API key
+rtrvr auth login --api-key rtrvr_...
+
+# Check auth status
+rtrvr auth status
+```
+
+### Token types
+
+| Token | Prefix | Access |
+|-------|--------|--------|
+| API key | `rtrvr_` | Full cloud + CLI endpoints |
+| OAuth token | `mcp_at_` | MCP endpoint only |
 
 ### Storage
 
-- default `authStorage=auto` (OS secure store preferred)
-- fallback `authStorage=config`
-- environment overrides:
-  - `RTRVR_AUTH_TOKEN`
-  - `RTRVR_API_KEY`
-  - `RTRVR_CLOUD_BASE_URL`
-  - `RTRVR_MCP_BASE_URL`
-  - `RTRVR_CONTROL_BASE_URL`
+Tokens are stored securely in your OS keychain (macOS Keychain / Linux secret-service) by default. Fallback to `~/.config/rtrvr/config.json` if no secure store is available.
 
-### Google OAuth in CLI
-
-Google OAuth is optional in CLI/API mode.
-
-- If Google auth is not linked, generic tool flows still run in JSON/API mode.
-- Google-dependent flows (Sheets/Docs/Drive/Slides) expose explicit capability status via:
-  - `GET /cli/google-auth/status`
-  - `rtrvr capabilities`
-- In API/service mode without a usable `authToken`, Google write flows are disabled (no implicit Sheets writes).
-
-## Progress streaming (SSE)
-
-Long-running executions can be streamed from:
-
-- `GET https://mcp.rtrvr.ai/cli/executions/{trajectoryId}/events`
-
-Supported query params:
-
-- `phase` (default `1`)
-- `since` (sequence cursor; default `0`)
-- `includeOutput` (default `false`)
-
-Payload size policy for streamed outputs:
-
-- inline `output`/`result` when payload is `<= 1MB`
-- when payload is `> 1MB`, events keep inline preview markers in `output`/`result` and include storage-backed references (`outputRef`/`resultRef`)
-- when the full envelope itself is oversized, responses may additionally include `metadata.responseRef`
-- reference fields are additive (preview remains in `output`/`result`; full payload is in the ref URL/path)
-
-The CLI consumes stream events opportunistically:
-
-- stream failures do not invalidate final execution response
-- final output always comes from the primary run response
-- by default, `rtrvr run` / `rtrvr agent` / `rtrvr scrape` open SSE and set `options.ui.emitEvents=true`
-- use `--no-stream` to disable SSE + emit events for that request
-- use `--no-stream-output` to suppress streamed output payloads while keeping status events
-
-`emitEvents` contract:
-
-- Cloud/API (`/agent`, routed `/scrape`) : events are written only when `options.ui.emitEvents` is explicitly `true`
-- Extension/MCP mode: execution events are written only when `options.ui.emitEvents` is explicitly `true`
-- CLI `run`/`agent`/`scrape` default behavior: stream on + `emitEvents=true`
-- CLI with `--no-stream`: does not force `emitEvents`
-
-## Configuration
-
-Common CLI config keys:
-
-- `mcpBaseUrl` (default `https://mcp.rtrvr.ai`)
-- `controlBaseUrl` (control plane; default `https://cli.rtrvr.ai`)
-- `defaultTarget`
-- `preferExtensionByDefault`
-- `retryMaxAttempts`
-- `retryBaseDelayMs`
-- `retryMaxDelayMs`
-
-Examples:
+Environment variables override stored credentials:
 
 ```bash
-rtrvr config set controlBaseUrl https://cli.rtrvr.ai
-rtrvr config set mcpBaseUrl https://mcp.rtrvr.ai
-rtrvr config set retryMaxAttempts 3
+export RTRVR_API_KEY=rtrvr_...
+# or
+export RTRVR_AUTH_TOKEN=rtrvr_...
 ```
 
-## SDK quickstart
+## Commands
 
-```ts
+### `rtrvr run` / `rtrvr agent`
+
+Run an AI agent task with smart routing.
+
+```bash
+rtrvr run "Find the latest pricing for each plan" --url https://example.com
+rtrvr run --input-file ./task.txt --url https://example.com --target cloud
+echo "Summarize this page" | rtrvr run --url https://example.com
+```
+
+| Option | Description |
+|--------|-------------|
+| `<input>` | Task description (positional) |
+| `--input <text>` | Task description (flag) |
+| `--input-file <path>` | Read task from file |
+| `--url <url>` | Target URL(s) |
+| `--target <mode>` | Routing: `auto`, `cloud`, `extension` |
+| `--cloud` | Shortcut for `--target cloud` |
+| `--extension` | Shortcut for `--target extension` |
+| `--device-id <id>` | Target a specific browser extension device |
+| `--schema-file <path>` | JSON schema for structured output |
+| `--json` | Machine-readable JSON output |
+| `--no-stream` | Disable real-time progress streaming |
+
+### `rtrvr scrape`
+
+Scrape URLs with cloud or extension routing.
+
+```bash
+rtrvr scrape --url https://example.com
+rtrvr scrape --url https://example.com --target extension --device-id my-device
+```
+
+| Option | Description |
+|--------|-------------|
+| `--url <url>` | URL(s) to scrape |
+| `--target <mode>` | Routing: `auto`, `cloud`, `extension` |
+| `--cloud` | Shortcut for `--target cloud` |
+| `--extension` | Shortcut for `--target extension` |
+| `--json` | Machine-readable JSON output |
+
+### `rtrvr extension`
+
+Route directly to the browser extension planner.
+
+```bash
+rtrvr extension "Click the login button and fill the form" --url https://example.com
+```
+
+### `rtrvr devices`
+
+List online browser extension devices.
+
+```bash
+rtrvr devices list
+```
+
+### `rtrvr skills`
+
+Manage local reusable skill templates.
+
+```bash
+rtrvr skills templates              # List built-in templates
+rtrvr skills install-template agent-web
+rtrvr skills add ./my-skill.md      # Add from markdown
+rtrvr skills list                   # Show installed skills
+rtrvr skills apply my-skill "Find financing options" --url https://example.com
+```
+
+### `rtrvr mcp`
+
+Configure rtrvr as an MCP server for AI coding tools.
+
+```bash
+# Generate config for Claude Code
+rtrvr mcp init --client claude
+
+# Generate config for Cursor
+rtrvr mcp init --client cursor
+
+# Print the MCP endpoint URL
+rtrvr mcp url
+```
+
+### `rtrvr config`
+
+Manage CLI configuration.
+
+```bash
+rtrvr config get                          # Show all config
+rtrvr config set defaultTarget cloud      # Set default routing
+rtrvr config set retryMaxAttempts 3       # Set retry policy
+```
+
+### `rtrvr profile` / `rtrvr capabilities`
+
+Check your identity and feature access.
+
+```bash
+rtrvr profile
+rtrvr capabilities
+```
+
+### `rtrvr doctor`
+
+Run diagnostics to verify endpoints, auth, and connectivity.
+
+```bash
+rtrvr doctor
+```
+
+## SDK Usage
+
+```typescript
 import { createRtrvrClient } from '@rtrvr-ai/sdk';
 
 const client = createRtrvrClient({
   apiKey: process.env.RTRVR_API_KEY!,
   defaultTarget: 'auto',
-  retryPolicy: {
-    maxAttempts: 3,
-    baseDelayMs: 200,
-    maxDelayMs: 2000,
-  },
 });
 
+// Run an agent task
 const result = await client.run({
   input: 'Find latest headline and author',
   urls: ['https://example.com'],
   target: 'auto',
-  response: { inlineOutputMaxBytes: 1_048_576 },
-  options: { ui: { emitEvents: true } }, // opt-in for API/SDK flows
 });
 
-// Canonical direct tool names are snake_case:
-// act_on_tab | extract_from_tab | crawl_and_extract_from_tab
-const extractResult = await client.tools.run({
-  tool: 'extract_from_tab',
-  params: {
-    user_input: 'Extract order rows and totals',
-    tab_urls: ['https://example.com/orders'],
-  },
+console.log(result);
+
+// Use specific tools
+const extracted = await client.tools.extract({
+  user_input: 'Extract all product names and prices',
+  tab_urls: ['https://example.com/products'],
 });
 
-// Optional convenience wrappers are also available:
-const actResult = await client.tools.act({
-  user_input: 'Click the first result and summarize the page',
-  tab_urls: ['https://example.com'],
+// Scrape
+const scraped = await client.scrape.run({
+  urls: ['https://example.com'],
 });
+
+// List devices
+const devices = await client.devices.list();
+
+// Check credits
+const credits = await client.credits.get();
 ```
 
-SDK event/output policy:
+## MCP Integration
 
-- SDK/API requests do not auto-enable `emitEvents`; set `options.ui.emitEvents=true` explicitly.
-- Inline payloads stay in `output`/`result` up to `1MB`.
-- Over-limit payloads keep inline preview markers and include refs (`outputRef` / `resultRef` / `responseRef`) in sibling fields.
-
-## Skills
-
-Local skills path:
-
-- `~/.config/rtrvr/skills/*.json`
-
-Useful commands:
+rtrvr works as a native MCP server, giving AI coding tools (Claude Code, Cursor, etc.) direct access to browser automation.
 
 ```bash
-rtrvr skills templates
-rtrvr skills add ./my-skill.md
-rtrvr skills validate my-skill
-rtrvr skills apply my-skill "Find financing options" --url https://example.com --target auto
+# Auto-configure for Claude Code
+rtrvr mcp init --client claude
+
+# Auto-configure for Cursor
+rtrvr mcp init --client cursor
 ```
 
-## Tests
+This writes the MCP server config to the appropriate location so your AI tool can call rtrvr tools directly.
+
+### Available MCP tools
+
+| Tool | Description |
+|------|-------------|
+| `planner` | Multi-step browser automation planner |
+| `act_on_tab` | Interact with a web page |
+| `extract_from_tab` | Extract structured data from a page |
+| `crawl_and_extract_from_tab` | Crawl and extract across multiple pages |
+| `cloud_agent` | Run a cloud AI agent |
+| `cloud_scrape` | Cloud-based page scraping |
+| `list_devices` | List online extension devices |
+| `get_current_credits` | Check credit balance |
+
+## Routing Behavior
+
+| Target | `run`/`agent` | `scrape` |
+|--------|---------------|----------|
+| `cloud` | Cloud `/agent` API | Cloud `/scrape` API |
+| `extension` | Extension planner via MCP | Extension scrape via MCP |
+| `auto` (default) | Check extension availability, fallback to cloud | Same with fallback |
+
+The response includes routing metadata:
+
+```json
+{
+  "metadata": {
+    "selectedMode": "cloud",
+    "fallbackApplied": true,
+    "fallbackReason": "no extension devices online"
+  }
+}
+```
+
+## Progress Streaming
+
+Long-running tasks stream real-time progress via SSE:
 
 ```bash
+# Default: streaming enabled
+rtrvr run "Complex multi-step task" --url https://example.com
+
+# Disable streaming
+rtrvr run "Quick task" --url https://example.com --no-stream
+```
+
+Events include: `planner_step`, `tool_start`, `tool_progress`, `tool_complete`, `credits_update`, and more.
+
+## Configuration
+
+Config is stored at `~/.config/rtrvr/config.json`.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `defaultTarget` | `auto` | Default routing mode |
+| `preferExtensionByDefault` | `true` | Prefer extension in auto mode |
+| `retryMaxAttempts` | `1` | Max retry attempts |
+| `retryBaseDelayMs` | `250` | Base retry delay |
+| `retryMaxDelayMs` | `4000` | Max retry delay |
+| `telemetryOptIn` | `false` | Telemetry opt-in |
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| [`@rtrvr-ai/cli`](https://www.npmjs.com/package/@rtrvr-ai/cli) | CLI binary (`rtrvr` command) |
+| [`@rtrvr-ai/sdk`](https://www.npmjs.com/package/@rtrvr-ai/sdk) | TypeScript SDK for programmatic use |
+| [`@rtrvr-ai/core`](https://www.npmjs.com/package/@rtrvr-ai/core) | Core API client, types, and transport |
+
+## Development
+
+```bash
+git clone https://github.com/rtrvr-ai/rtrvr-cli.git
+cd rtrvr-cli
+pnpm install
 pnpm build
-pnpm typecheck
-pnpm test
+node packages/cli/dist/index.js --help
 ```
 
-## Additional docs
+## License
 
-- `docs/CLI_OPERATIONS.md`
-- `docs/SKILLS.md`
-- `docs/V1_CONTRACT.md`
+[Apache-2.0](LICENSE)

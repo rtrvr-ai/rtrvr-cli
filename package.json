@@ -3,12 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "description": "rtrvr CLI and SDK monorepo",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtrvr-ai/rtrvr-cli"
+  },
+  "homepage": "https://rtrvr.ai",
   "packageManager": "pnpm@10.11.0",
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm --filter @rtrvr-ai/core build && pnpm --filter @rtrvr-ai/sdk build && pnpm -r typecheck",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "publish-packages": "pnpm -r publish --access public",
+    "version:bump": "pnpm -r exec -- npm version patch --no-git-tag-version"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

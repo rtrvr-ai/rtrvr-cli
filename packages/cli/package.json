@@ -1,7 +1,29 @@
 {
   "name": "@rtrvr-ai/cli",
   "version": "0.1.0",
-  "description": "Official RTRVR CLI for /agent, /scrape, and /mcp",
+  "description": "Official rtrvr CLI — browser automation for AI agents and humans",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtrvr-ai/rtrvr-cli",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://rtrvr.ai",
+  "keywords": [
+    "rtrvr",
+    "cli",
+    "browser-automation",
+    "web-agent",
+    "mcp",
+    "ai-agent",
+    "scraping",
+    "web-scraping",
+    "automation",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "type": "module",
   "bin": {
     "rtrvr": "dist/index.js"
@@ -17,8 +39,12 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "pnpm run build && node --test test/*.test.mjs",
     "lint": "echo 'No lint configured for @rtrvr-ai/cli'"

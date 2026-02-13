@@ -2,6 +2,25 @@
   "name": "@rtrvr-ai/core",
   "version": "0.1.0",
   "description": "Core runtime and API client primitives for rtrvr CLI/SDK",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtrvr-ai/rtrvr-cli",
+    "directory": "packages/core"
+  },
+  "homepage": "https://rtrvr.ai",
+  "keywords": [
+    "rtrvr",
+    "browser-automation",
+    "web-agent",
+    "mcp",
+    "ai-agent",
+    "scraping",
+    "api-client"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,8 +33,12 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "pnpm run build && node --test test/*.test.mjs",
     "lint": "echo 'No lint configured for @rtrvr-ai/core'"

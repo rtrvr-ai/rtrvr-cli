@@ -1,3 +1,22 @@
 node_modules
 dist
 .pnpm-store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.tgz
+.turbo
+coverage/
+
+# IDE
+.idea/
+*.swp
+*.swo
