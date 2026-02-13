@@ -55,7 +55,7 @@ test('mcp_at tokens continue to work for MCP tool calls', async () => {
   assert.equal(calls[0].url, 'https://mcp.test.rtrvr.ai');
 });
 
-test('run defaults to cloud /agent when auto target and extension preference is disabled', async () => {
+test('run defaults to cloud /agent when auto target and no extension devices are online', async () => {
   const calls = [];
 
   const client = new RtrvrClient({
@@ -65,11 +65,22 @@ test('run defaults to cloud /agent when auto target and extension preference is 
     defaultTarget: 'auto',
     preferExtensionByDefault: false,
     fetchImpl: async (url, init) => {
-      calls.push({ url: String(url), init });
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ url: String(url), body });
+
+      // list_devices returns no online devices
+      if (String(url) === 'https://mcp.test.rtrvr.ai' && body?.tool === 'list_devices') {
+        return jsonResponse({
+          success: true,
+          data: { online: false, deviceCount: 0, devices: [] },
+        });
+      }
+
       if (String(url).endsWith('/agent')) {
         return jsonResponse({ ok: true, path: 'agent' });
       }
-      throw new Error(`Unexpected call to ${String(url)}`);
+
+      throw new Error(`Unexpected call to ${String(url)} (tool: ${body?.tool})`);
     },
   });
 
@@ -81,9 +92,9 @@ test('run defaults to cloud /agent when auto target and extension preference is 
   assert.equal(result.metadata.fallbackApplied, false);
   assert.equal(result.data?.ok, true);
   assert.equal(result.data?.path, 'agent');
-  assert.equal(result.data?.metadata?.attempt, 1);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://api.test.rtrvr.ai/agent');
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].body.tool, 'list_devices');
+  assert.equal(calls[1].url, 'https://api.test.rtrvr.ai/agent');
 });
 
 test('run prefers extension planner when extension is online in auto mode', async () => {

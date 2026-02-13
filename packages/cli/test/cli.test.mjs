@@ -16,6 +16,12 @@ async function runCli(args, options = {}) {
   return execFileAsync('node', [cliPath, ...args], {
     env: {
       ...process.env,
+      // Isolate tests from host machine auth/config
+      RTRVR_CONFIG_DIR: env.RTRVR_CONFIG_DIR ?? path.join(os.tmpdir(), 'rtrvr-cli-test-config-' + process.pid),
+      RTRVR_AUTH_TOKEN: '',
+      RTRVR_API_KEY: '',
+      RTRVR_KEYCHAIN_SERVICE: 'rtrvr-cli-test-noop',
+      RTRVR_KEYCHAIN_ACCOUNT: 'test-noop',
       ...env,
     },
     input,
