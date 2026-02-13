@@ -1,6 +1,6 @@
 # @rtrvr-ai/cli
 
-Official RTRVR CLI for browser automation with cloud + extension routing.
+Official rtrvr CLI for browser automation with cloud + extension routing.
 
 ## Install
 

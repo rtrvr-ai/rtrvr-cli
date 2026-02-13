@@ -1,4 +1,4 @@
-# RTRVR Skills Contract (v1)
+# rtrvr.ai Skills Contract (v1)
 
 This document defines the stable local skill contract used by `rtrvr skills` for both humans and agent runtimes.
 Legacy skill schema variants are not maintained in v1; normalize skills to this contract.

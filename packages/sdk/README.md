@@ -1,6 +1,6 @@
 # @rtrvr-ai/sdk
 
-Official TypeScript SDK for RTRVR APIs. It wraps `@rtrvr-ai/core` with a higher-level interface and re-exports all core types and helpers.
+Official TypeScript SDK for rtrvr.ai APIs. It wraps `@rtrvr-ai/core` with a higher-level interface and re-exports all core types and helpers.
 
 ## Install
 
