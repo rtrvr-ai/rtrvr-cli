@@ -30,7 +30,7 @@ const BUILTIN_SKILL_TEMPLATES: BuiltinSkillTemplate[] = [
     requiresLocalSession: false,
     mcpTools: ['planner', 'act_on_tab', 'extract_from_tab', 'crawl_and_extract_from_tab'],
     promptTemplate: [
-      'You are RTRVR agent. Complete this task end-to-end with robust planning.',
+      'You are rtrvr.ai agent. Complete this task end-to-end with robust planning.',
       'Task: {{input}}',
       'Return concise final result plus any key assumptions.',
     ].join('\n'),

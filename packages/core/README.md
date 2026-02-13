@@ -1,6 +1,6 @@
 # @rtrvr-ai/core
 
-Low-level client, types, and HTTP transport for RTRVR cloud and MCP endpoints. This package powers `@rtrvr-ai/sdk` and `@rtrvr-ai/cli`.
+Low-level client, types, and HTTP transport for rtrvr.ai cloud and MCP endpoints. This package powers `@rtrvr-ai/sdk` and `@rtrvr-ai/cli`.
 
 ## Install
 

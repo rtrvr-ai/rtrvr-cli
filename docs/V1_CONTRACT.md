@@ -1,4 +1,4 @@
-# RTRVR CLI/SDK v1 Contract
+# rtrvr.ai CLI/SDK v1 Contract
 
 Canonical behavior contract for `rtrvr-cli`, `rtrvr-cloud-backend`, `rtrvr-web-agent`, and `rtrvr-relay`.
 

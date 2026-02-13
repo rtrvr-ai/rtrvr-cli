@@ -33,7 +33,7 @@ All three packages must use the same version.
 pnpm -r exec -- npm version patch --no-git-tag-version
 
 # Or set a specific version
-pnpm -r exec -- npm version 0.2.0 --no-git-tag-version
+pnpm -r exec -- npm version 0.2.1 --no-git-tag-version
 
 # Also bump root package.json
 npm version patch --no-git-tag-version
@@ -110,7 +110,7 @@ The workflow will:
 
 ```bash
 # Set prerelease version
-pnpm -r exec -- npm version 0.2.0-beta.1 --no-git-tag-version
+pnpm -r exec -- npm version 0.2.1-beta.1 --no-git-tag-version
 
 # Publish with beta tag (users won't get it on `npm install` by default)
 cd packages/core && pnpm publish --access public --tag beta && cd ../..

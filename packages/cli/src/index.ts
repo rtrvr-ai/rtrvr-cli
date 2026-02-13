@@ -163,8 +163,8 @@ const program = new Command();
 
 program
   .name('rtrvr')
-  .description('RTRVR CLI: unified cloud + extension runtime for humans and agents.')
-  .version('0.2.0');
+  .description('rtrvr.ai CLI: unified cloud + extension runtime for humans and agents.')
+  .version('0.2.1');
 
 registerAuthCommands(program);
 registerExecutionCommands(program);
@@ -747,7 +747,7 @@ function registerDoctorCommand(root: Command): void {
 }
 
 function registerSkillsCommands(root: Command): void {
-  const skills = root.command('skills').description('Manage local reusable RTRVR skills.');
+  const skills = root.command('skills').description('Manage local reusable rtrvr skills.');
 
   skills
     .command('list')
@@ -917,7 +917,7 @@ function registerSkillsCommands(root: Command): void {
 
 function addAuthLoginOptions(command: Command): Command {
   return command
-    .option('--api-key <key>', 'RTRVR API key/token (rtrvr_... or mcp_at_...)')
+    .option('--api-key <key>', 'rtrvr API key/token (rtrvr_... or mcp_at_...)')
     .option('--target <target>', 'Default run target: auto|cloud|extension (preferred)')
     .option('--cloud', 'Shortcut for --target cloud')
     .option('--extension', 'Shortcut for --target extension')
@@ -1010,7 +1010,7 @@ async function handleAuthLogin(options: AuthLoginOptions): Promise<void> {
     return;
   }
 
-  printLine('RTRVR authentication saved.');
+  printLine('rtrvr authentication saved.');
   printKeyValue('Token', maskApiKey(token));
   printKeyValue('Method', loginMethod);
   printKeyValue('OAuth attempted', String(oauthAttempted));

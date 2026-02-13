@@ -1,4 +1,4 @@
-# RTRVR CLI Operations Guide
+# rtrvr.ai CLI Operations Guide
 
 Operational runbook for humans and agent runtimes using `rtrvr` in production.
 
