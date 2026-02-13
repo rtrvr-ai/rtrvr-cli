@@ -291,7 +291,7 @@ Config is stored at `~/.config/rtrvr/config.json`.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `defaultTarget` | `auto` | Default routing mode |
-| `preferExtensionByDefault` | `true` | Prefer extension in auto mode |
+| `preferExtensionByDefault` | `false` | Prefer extension in auto mode |
 | `retryMaxAttempts` | `1` | Max retry attempts |
 | `retryBaseDelayMs` | `250` | Base retry delay |
 | `retryMaxDelayMs` | `4000` | Max retry delay |
