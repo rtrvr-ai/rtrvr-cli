@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RETURN OF THE AGENTS — rtrvr.ai</title>
+  <meta name="description" content="Build with AI browser agents. Five surfaces, one platform. Rover embed, CLI & SDK, Chrome Extension, Cloud REST API, and MCP Server. Get $25 in hackathon credits.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+
+  <style>
+    :root {
+      --orange: #FF4C00;
+      --orange-light: #FF6A2E;
+      --orange-bg: rgba(255,76,0,0.06);
+      --orange-border: rgba(255,76,0,0.18);
+
+      --bg: #FAF9F6;
+      --bg-alt: #F0EEEB;
+      --bg-card: #FFFFFF;
+      --bg-code: #1A1A1A;
+
+      --text: #1A1A1A;
+      --text-secondary: #666666;
+      --text-muted: #999999;
+      --text-faint: #BBBBBB;
+
+      --border: rgba(0,0,0,0.08);
+      --border-strong: rgba(0,0,0,0.14);
+
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-serif: 'Instrument Serif', Georgia, serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --radius: 12px;
+      --nav-h: 72px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    ul { list-style: none; }
+    img { display: block; max-width: 100%; }
+    button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+    /* Label — mono uppercase small, like the deck */
+    .label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--orange);
+    }
+    .label-muted {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Accent bar — orange 3px line */
+    .accent-bar {
+      width: 32px;
+      height: 3px;
+      background: var(--orange);
+      border-radius: 2px;
+    }
+
+    /* Fade-in */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      height: var(--nav-h);
+      display: flex;
+      align-items: center;
+      background: rgba(250,249,246,0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s;
+    }
+    nav.scrolled { border-bottom-color: var(--border); }
+    .nav-inner {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 40px;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .nav-brand img { height: 32px; width: 32px; }
+    .nav-brand-name {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .nav-sep {
+      width: 1px;
+      height: 20px;
+      background: var(--border-strong);
+      margin-left: -8px;
+    }
+    .nav-links { display: flex; gap: 32px; }
+    .nav-links a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-event {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .nav-event-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--border-strong);
+    }
+
+    .btn-primary {
+      background: var(--orange);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 22px;
+      border-radius: 8px;
+      display: inline-block;
+      transition: opacity 0.15s, transform 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-outline {
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 22px;
+      border-radius: 8px;
+      display: inline-block;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-outline:hover { border-color: var(--text); background: rgba(0,0,0,0.02); }
+
+    .nav-hamburger {
+      display: none;
+      margin-left: auto;
+      padding: 6px;
+      color: var(--text);
+      font-size: 1.4rem;
+    }
+    .nav-mobile { display: none; }
+    @media (max-width: 768px) {
+      .nav-links, .nav-right { display: none; }
+      .nav-hamburger { display: flex; align-items: center; }
+      .nav-mobile.open {
+        display: block;
+        position: fixed;
+        top: var(--nav-h);
+        left: 0; right: 0;
+        background: rgba(250,249,246,0.98);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 32px 28px;
+        z-index: 99;
+      }
+      .nav-mobile a {
+        display: block;
+        padding: 14px 0;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border);
+      }
+      .nav-mobile .btn-primary { display: inline-block; margin-top: 20px; }
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      padding: calc(var(--nav-h) + 100px) 0 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    /* subtle grid background — same as deck */
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      margin-bottom: 40px;
+      position: relative;
+    }
+    .hero-eyebrow .prompt { color: var(--orange); font-weight: 700; font-size: 13px; }
+    .hero-eyebrow .sep { color: var(--text-faint); }
+    .hero-eyebrow a {
+      color: var(--orange);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .hero h1 {
+      font-family: var(--font-sans);
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.0;
+      margin-bottom: 28px;
+      color: var(--text);
+      position: relative;
+    }
+    .hero h1 .accent {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--orange);
+    }
+
+    .hero-sub {
+      max-width: 540px;
+      margin: 0 auto 40px;
+      font-size: 17px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      position: relative;
+    }
+
+    /* Stats bar — like the deck bottom row */
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      margin: 48px auto;
+      max-width: 680px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .stat {
+      flex: 1;
+      padding: 28px 0;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+    .stat-value {
+      font-family: var(--font-sans);
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-value .num { color: var(--orange); }
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: center;
+      position: relative;
+    }
+    .btn-hero-primary {
+      background: var(--orange);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 15px 36px;
+      border-radius: 8px;
+      display: inline-block;
+      transition: opacity 0.15s, transform 0.15s, box-shadow 0.2s;
+    }
+    .btn-hero-primary:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(255,76,0,0.25);
+    }
+    .btn-hero-outline {
+      border: 1px solid var(--border-strong);
+      background: var(--bg-card);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 500;
+      padding: 14px 32px;
+      border-radius: 8px;
+      display: inline-block;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-hero-outline:hover { border-color: var(--text); }
+
+    /* ─── SECTIONS ─── */
+    section { padding: 100px 0; }
+    .section-head { margin-bottom: 56px; }
+    .section-title {
+      font-family: var(--font-sans);
+      font-size: clamp(2rem, 4.5vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .section-title .accent {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--orange);
+    }
+    .section-subtitle {
+      max-width: 440px;
+      color: var(--text-secondary);
+      font-size: 16px;
+      line-height: 1.65;
+      margin-top: 16px;
+    }
+
+    /* alt background sections */
+    .section-alt { background: var(--bg-alt); }
+
+    /* orange divider between sections */
+    .section-divider {
+      height: 3px;
+      background: var(--orange);
+    }
+
+    /* ─── PRODUCTS ─── */
+    .products-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .product-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .product-card:hover {
+      border-color: rgba(0,0,0,0.16);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .product-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .product-card h3 {
+      font-family: var(--font-sans);
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .product-tagline {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .product-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+    .product-code {
+      background: var(--bg-code);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #E0E0E0;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.7;
+    }
+    .product-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: auto;
+    }
+    .product-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      letter-spacing: 0.02em;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    a.product-tag:hover { color: var(--orange); border-color: var(--orange-border); }
+
+    /* syntax */
+    .hl-kw  { color: #FF6A2E; }
+    .hl-str { color: #A5D6A7; }
+    .hl-cm  { color: #666; font-style: italic; }
+    .hl-fn  { color: #80CBFF; }
+    .hl-pm  { color: #E0E0E0; }
+
+    @media (max-width: 700px) { .products-grid { grid-template-columns: 1fr; } }
+
+    /* ─── QUICK START TABS ─── */
+    #tab-cli, #tab-sdk, #tab-mcp, #tab-rover, #tab-api { display: none; }
+
+    .tabs-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab-bar label {
+      padding: 14px 24px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      margin-bottom: -1px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .tab-bar label:hover { color: var(--text); }
+
+    #tab-cli:checked   ~ .tab-bar label[for="tab-cli"],
+    #tab-sdk:checked   ~ .tab-bar label[for="tab-sdk"],
+    #tab-mcp:checked   ~ .tab-bar label[for="tab-mcp"],
+    #tab-rover:checked ~ .tab-bar label[for="tab-rover"],
+    #tab-api:checked   ~ .tab-bar label[for="tab-api"] {
+      color: var(--orange);
+      border-bottom-color: var(--orange);
+    }
+
+    .tab-panels { position: relative; }
+    .tab-panel { display: none; }
+    #tab-cli:checked   ~ .tab-panels #panel-cli,
+    #tab-sdk:checked   ~ .tab-panels #panel-sdk,
+    #tab-mcp:checked   ~ .tab-panels #panel-mcp,
+    #tab-rover:checked ~ .tab-panels #panel-rover,
+    #tab-api:checked   ~ .tab-panels #panel-api { display: block; }
+
+    .code-block { position: relative; background: var(--bg-code); }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .code-lang {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: #666;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .copy-btn:hover { color: #ccc; border-color: rgba(255,255,255,0.2); }
+    .copy-btn i { font-size: 13px; }
+    pre {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.8;
+      padding: 22px 24px;
+      overflow-x: auto;
+      color: #E0E0E0;
+    }
+
+    /* ─── USE CASES ─── */
+    .usecases-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .usecases-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .usecases-grid { grid-template-columns: 1fr; } }
+
+    .usecase-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 200px;
+      transition: border-color 0.2s;
+    }
+    .usecase-card:hover { border-color: rgba(0,0,0,0.16); }
+    .usecase-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .usecase-num {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-faint);
+    }
+    .usecase-card h3 {
+      font-family: var(--font-sans);
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      margin-top: 4px;
+    }
+    .usecase-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-style: italic;
+    }
+    .usecase-bar {
+      width: 28px;
+      height: 3px;
+      background: var(--orange);
+      border-radius: 2px;
+      margin-top: auto;
+    }
+
+    /* ─── CREDITS ─── */
+    .credits-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    @media (max-width: 700px) { .credits-panel { grid-template-columns: 1fr; } }
+
+    .credits-left {
+      background: var(--orange);
+      color: #fff;
+      padding: 56px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .credits-left .label { color: rgba(255,255,255,0.7); }
+    .credits-headline {
+      font-family: var(--font-sans);
+      font-size: clamp(2.2rem, 4vw, 3rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-top: 16px;
+      margin-bottom: 6px;
+    }
+    .credits-headline .serif {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 400;
+    }
+    .credits-sub {
+      font-size: 15px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.6;
+      margin-top: 8px;
+    }
+    .credits-sub strong { color: #fff; font-weight: 700; }
+    .credits-dot {
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border-radius: 50%;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+    .credits-offer {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .credits-right {
+      background: var(--bg-card);
+      padding: 56px 48px;
+    }
+    .credits-right h3 {
+      font-family: var(--font-sans);
+      font-weight: 800;
+      font-size: 1.1rem;
+      margin-bottom: 32px;
+      letter-spacing: -0.01em;
+    }
+    .steps { display: flex; flex-direction: column; gap: 28px; }
+    .step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--orange);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--orange);
+      flex-shrink: 0;
+    }
+    .step-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 3px;
+    }
+    .step-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+    .step-desc a { color: var(--orange); text-decoration: underline; text-underline-offset: 2px; }
+    .step-desc code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--bg-alt);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 700px) {
+      .credits-left, .credits-right { padding: 36px 28px; }
+    }
+
+    /* ─── RESOURCES ─── */
+    .resources-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 600px) { .resources-grid { grid-template-columns: 1fr; } }
+
+    .resource-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      transition: border-color 0.2s;
+    }
+    .resource-card:hover { border-color: rgba(0,0,0,0.18); }
+    .resource-icon {
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      background: var(--orange-bg);
+      border: 1px solid var(--orange-border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--orange);
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .resource-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 2px;
+      color: var(--text);
+    }
+    .resource-url {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .resource-arrow {
+      margin-left: auto;
+      color: var(--text-faint);
+      font-size: 1rem;
+      flex-shrink: 0;
+      transition: color 0.15s;
+    }
+    .resource-card:hover .resource-arrow { color: var(--orange); }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 48px 0 36px;
+      background: var(--bg);
+    }
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 48px;
+      justify-content: space-between;
+      margin-bottom: 40px;
+    }
+    .footer-brand img { height: 24px; margin-bottom: 10px; }
+    .footer-brand-name {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .footer-tagline {
+      font-size: 14px;
+      color: var(--text-secondary);
+      max-width: 220px;
+      line-height: 1.6;
+    }
+    .footer-tagline .accent-line {
+      color: var(--orange);
+      font-weight: 600;
+    }
+    .footer-col h4 {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+    .footer-col a {
+      display: block;
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      transition: color 0.15s;
+    }
+    .footer-col a:hover { color: var(--text); }
+    .footer-bottom {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-bottom span { font-size: 13px; color: var(--text-muted); }
+    .footer-bottom a {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      transition: color 0.15s;
+    }
+    .footer-bottom a:hover { color: var(--text); }
+
+    @media (max-width: 580px) {
+      section { padding: 72px 0; }
+      .footer-inner { flex-direction: column; gap: 32px; }
+      .hero { padding: calc(var(--nav-h) + 60px) 0 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-brand">
+      <img src="https://rtrvr.ai/rtrvrai-logo.png" alt="rtrvr.ai" onerror="this.style.display='none'">
+      <div class="nav-sep"></div>
+      <span class="nav-brand-name">RTRVR.AI</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#products">Products</a></li>
+      <li><a href="#quickstart">Quick Start</a></li>
+      <li><a href="#credits">Credits</a></li>
+      <li><a href="#resources">Resources</a></li>
+    </ul>
+    <div class="nav-right">
+      <span class="nav-event">RETURN OF THE AGENTS</span>
+      <div class="nav-event-sep"></div>
+      <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener" class="btn-primary">Register Free →</a>
+    </div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu">
+      <i class="ph-bold ph-list"></i>
+    </button>
+  </div>
+</nav>
+
+<div class="nav-mobile" id="nav-mobile">
+  <a href="#products">Products</a>
+  <a href="#quickstart">Quick Start</a>
+  <a href="#credits">Credits</a>
+  <a href="#resources">Resources</a>
+  <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener" class="btn-primary">Register Free →</a>
+</div>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero">
+  <div class="container" style="position:relative">
+
+    <div class="hero-eyebrow fade-up">
+      <span class="prompt">›_</span>
+      RETURN OF THE AGENTS — HACKATHON
+      <span class="sep">•</span>
+      <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener">LU.MA/0XGXTPDT</a>
+    </div>
+
+    <h1 class="fade-up">The web wasn't<br>built for AI.<br><span class="accent">We fixed that.</span></h1>
+
+    <p class="hero-sub fade-up">
+      Five surfaces. One platform. Embed AI agents, automate the web through
+      CLI, connect to Claude via MCP, or call our REST API — all powered by
+      rtrvr's browser AI infrastructure.
+    </p>
+
+    <div class="hero-stats fade-up">
+      <div class="stat">
+        <div class="stat-value">81.4%</div>
+        <div class="stat-label">WEBBENCH #1 — BEATS HUMANS</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">21K+</div>
+        <div class="stat-label">USERS IN 4 MONTHS</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">$0.12</div>
+        <div class="stat-label">AVG COST PER TASK</div>
+      </div>
+    </div>
+
+    <div class="hero-actions fade-up">
+      <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener" class="btn-hero-primary">Register on Luma →</a>
+      <a href="https://github.com/rtrvr-ai/rtrvr-cli" target="_blank" rel="noopener" class="btn-hero-outline">View GitHub ↗</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- orange divider -->
+<div class="section-divider"></div>
+
+<!-- ══════════════ PRODUCTS ══════════════ -->
+<section id="products" class="section-alt">
+  <div class="container">
+    <div class="section-head fade-up">
+      <div class="label">YOUR HACKATHON TOOLKIT</div>
+      <h2 class="section-title">Five surfaces.<br><span class="accent">One brain.</span></h2>
+      <p class="section-subtitle">All surfaces share the same intelligence — 1.5M+ trajectories. Pick the right surface for your use case.</p>
+    </div>
+    <div class="products-grid">
+
+      <div class="product-card fade-up">
+        <div class="product-card-header">
+          <h3>Extension</h3>
+          <span class="label">MOST POPULAR</span>
+        </div>
+        <div class="product-tagline">Your browser sessions, supercharged</div>
+        <div class="product-desc">Run agents on login-protected sites — LinkedIn, dashboards, paywalled content. 10+ parallel tabs. Completely undetectable.</div>
+        <div class="product-code"><span class="hl-cm"># Route tasks to your local browser</span>
+<span class="hl-kw">rtrvr</span> extension <span class="hl-str">"Click login & fill form"</span> \
+  --url https://app.example.com</div>
+        <div class="product-tags">
+          <a href="https://rtrvr.ai/extension" target="_blank" rel="noopener" class="product-tag">Logged-in sessions</a>
+          <span class="product-tag">Parallel tabs</span>
+          <span class="product-tag">Zero detection</span>
+        </div>
+      </div>
+
+      <div class="product-card fade-up">
+        <div class="product-card-header">
+          <h3>Cloud API</h3>
+          <span class="label">AT SCALE</span>
+        </div>
+        <div class="product-tagline">1000+ browsers, zero infra</div>
+        <div class="product-desc">RESTful /scrape and /agent endpoints. Spin up cloud browsers on demand. Run 24/7 automations without a single server.</div>
+        <div class="product-code"><span class="hl-kw">curl</span> -X POST https://api.rtrvr.ai/agent \
+  -H <span class="hl-str">"Authorization: Bearer $KEY"</span> \
+  -d <span class="hl-str">'{"input":"Extract pricing","url":"..."}'</span></div>
+        <div class="product-tags">
+          <a href="https://rtrvr.ai/docs/api" target="_blank" rel="noopener" class="product-tag">/scrape</a>
+          <a href="https://rtrvr.ai/docs/api" target="_blank" rel="noopener" class="product-tag">/agent</a>
+          <span class="product-tag">Google Sheets</span>
+        </div>
+      </div>
+
+      <div class="product-card fade-up">
+        <div class="product-card-header">
+          <h3>MCP Server</h3>
+          <span class="label-muted">DEV WORKFLOW</span>
+        </div>
+        <div class="product-tagline">Connect your favorite AI tools</div>
+        <div class="product-desc">Your Claude, Cursor, and n8n agents can now act on the real web. Plug-and-play MCP integration.</div>
+        <div class="product-code"><span class="hl-kw">rtrvr</span> mcp init --client claude
+<span class="hl-cm"># 8 browser tools instantly available</span></div>
+        <div class="product-tags">
+          <span class="product-tag">Claude Desktop</span>
+          <span class="product-tag">Cursor IDE</span>
+          <span class="product-tag">n8n / Zapier</span>
+        </div>
+      </div>
+
+      <div class="product-card fade-up">
+        <div class="product-card-header">
+          <h3>CLI</h3>
+          <span class="label-muted">TERMINAL</span>
+        </div>
+        <div class="product-tagline">Script it. Pipe it. Ship it.</div>
+        <div class="product-desc">npm install -g @rtrvr-ai/cli. Pipe outputs, chain with jq, integrate into your CI/CD. Built for hackers.</div>
+        <div class="product-code"><span class="hl-kw">npm</span> install -g @rtrvr-ai/cli
+<span class="hl-kw">rtrvr</span> run <span class="hl-str">"Extract top 10 products"</span> \
+  --url https://example.com --json</div>
+        <div class="product-tags">
+          <span class="product-tag">npm install</span>
+          <span class="product-tag">Pipe-friendly</span>
+          <span class="product-tag">CI/CD ready</span>
+        </div>
+      </div>
+
+      <!-- Full-width Rover card -->
+      <div class="product-card fade-up" style="grid-column: 1 / -1;">
+        <div class="product-card-header">
+          <h3>Rover</h3>
+          <span class="label">NEW PRODUCT</span>
+        </div>
+        <div class="product-tagline">Every website gets its own AI agent.</div>
+        <div class="product-desc">One script tag. It clicks, fills, navigates, and converts. Embed a full AI browser agent directly into your website — your users interact with it like a copilot.</div>
+        <div class="product-code"><span class="hl-cm">&lt;!-- one line of code --&gt;</span>
+&lt;<span class="hl-kw">script</span> <span class="hl-pm">src</span>=<span class="hl-str">"https://rover.rtrvr.ai/embed.js"</span> <span class="hl-pm">async</span>&gt;&lt;/<span class="hl-kw">script</span>&gt;
+
+<span class="hl-cm">// Or via npm for React/Vue/Next.js</span>
+<span class="hl-kw">import</span> { boot, shutdown } <span class="hl-kw">from</span> <span class="hl-str">'@rtrvr-ai/rover'</span>;
+<span class="hl-fn">boot</span>({ <span class="hl-pm">siteId</span>: <span class="hl-str">'...'</span>, <span class="hl-pm">publicKey</span>: <span class="hl-str">'pk_site_...'</span> });</div>
+        <div class="product-tags">
+          <a href="https://rover.rtrvr.ai/workspace" target="_blank" rel="noopener" class="product-tag">Rover Workspace</a>
+          <a href="https://github.com/rtrvr-ai/rover" target="_blank" rel="noopener" class="product-tag">GitHub</a>
+          <a href="https://www.npmjs.com/package/@rtrvr-ai/rover" target="_blank" rel="noopener" class="product-tag">npm</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ QUICK START ══════════════ -->
+<section id="quickstart">
+  <div class="container">
+    <div class="section-head fade-up">
+      <div class="label">QUICK START</div>
+      <h2 class="section-title">Get running<br><span class="accent">in minutes.</span></h2>
+    </div>
+
+    <div class="tabs-box fade-up">
+      <input type="radio" name="tab" id="tab-cli" checked>
+      <input type="radio" name="tab" id="tab-sdk">
+      <input type="radio" name="tab" id="tab-mcp">
+      <input type="radio" name="tab" id="tab-rover">
+      <input type="radio" name="tab" id="tab-api">
+
+      <div class="tab-bar">
+        <label for="tab-cli">CLI</label>
+        <label for="tab-sdk">SDK</label>
+        <label for="tab-mcp">MCP</label>
+        <label for="tab-rover">Rover</label>
+        <label for="tab-api">REST API</label>
+      </div>
+
+      <div class="tab-panels">
+
+        <div class="tab-panel" id="panel-cli">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">bash</span>
+              <button class="copy-btn" data-target="code-cli"><i class="ph ph-copy"></i> Copy</button>
+            </div>
+            <pre id="code-cli"><span class="hl-cm"># 1. Install globally</span>
+<span class="hl-kw">npm</span> install -g @rtrvr-ai/cli
+
+<span class="hl-cm"># 2. Authenticate</span>
+<span class="hl-kw">rtrvr</span> auth login               <span class="hl-cm"># browser OAuth</span>
+<span class="hl-kw">rtrvr</span> auth login --api-key rtrvr_...  <span class="hl-cm"># or direct API key</span>
+
+<span class="hl-cm"># 3. Run an AI agent task</span>
+<span class="hl-kw">rtrvr</span> run <span class="hl-str">"Extract top 10 products and prices"</span> \
+  --url https://example.com
+
+<span class="hl-cm"># 4. Structured JSON output</span>
+<span class="hl-kw">rtrvr</span> run <span class="hl-str">"Get all pricing tiers"</span> \
+  --url https://example.com/pricing \
+  --schema-file ./schema.json --json
+
+<span class="hl-cm"># 5. Scrape a page</span>
+<span class="hl-kw">rtrvr</span> scrape --url https://example.com
+
+<span class="hl-cm"># 6. Diagnose connectivity</span>
+<span class="hl-kw">rtrvr</span> doctor</pre>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-sdk">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">typescript</span>
+              <button class="copy-btn" data-target="code-sdk"><i class="ph ph-copy"></i> Copy</button>
+            </div>
+            <pre id="code-sdk"><span class="hl-kw">import</span> { createRtrvrClient } <span class="hl-kw">from</span> <span class="hl-str">'@rtrvr-ai/sdk'</span>;
+
+<span class="hl-kw">const</span> client = <span class="hl-fn">createRtrvrClient</span>({
+  apiKey: process.env.RTRVR_API_KEY<span class="hl-kw">!</span>,
+  defaultTarget: <span class="hl-str">'auto'</span>,
+});
+
+<span class="hl-cm">// Run an agent task</span>
+<span class="hl-kw">const</span> result = <span class="hl-kw">await</span> client.<span class="hl-fn">run</span>({
+  input: <span class="hl-str">'Find latest headline and author'</span>,
+  urls: [<span class="hl-str">'https://example.com'</span>],
+  target: <span class="hl-str">'auto'</span>,
+});
+
+<span class="hl-cm">// Extract structured data</span>
+<span class="hl-kw">const</span> extracted = <span class="hl-kw">await</span> client.tools.<span class="hl-fn">extract</span>({
+  user_input: <span class="hl-str">'Extract all product names and prices'</span>,
+  tab_urls: [<span class="hl-str">'https://example.com/products'</span>],
+});
+
+<span class="hl-cm">// Check credit balance</span>
+<span class="hl-kw">const</span> credits = <span class="hl-kw">await</span> client.credits.<span class="hl-fn">get</span>();</pre>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-mcp">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">bash</span>
+              <button class="copy-btn" data-target="code-mcp"><i class="ph ph-copy"></i> Copy</button>
+            </div>
+            <pre id="code-mcp"><span class="hl-cm"># 1. Install & auth</span>
+<span class="hl-kw">npm</span> install -g @rtrvr-ai/cli
+<span class="hl-kw">rtrvr</span> auth login
+
+<span class="hl-cm"># 2. Wire into Claude Code</span>
+<span class="hl-kw">rtrvr</span> mcp init --client claude
+
+<span class="hl-cm"># 2b. Or Cursor</span>
+<span class="hl-kw">rtrvr</span> mcp init --client cursor
+
+<span class="hl-cm">────────────────────────────────────────</span>
+<span class="hl-cm">8 MCP tools exposed to your AI client:</span>
+<span class="hl-cm">────────────────────────────────────────</span>
+<span class="hl-cm">  planner              Multi-step browser automation</span>
+<span class="hl-cm">  act_on_tab           Interact with a web page</span>
+<span class="hl-cm">  extract_from_tab     Extract structured data</span>
+<span class="hl-cm">  crawl_and_extract    Crawl + extract across pages</span>
+<span class="hl-cm">  cloud_agent          Run a cloud AI agent</span>
+<span class="hl-cm">  cloud_scrape         Cloud-based scraping</span>
+<span class="hl-cm">  list_devices         List extension devices</span>
+<span class="hl-cm">  get_current_credits  Check credit balance</span></pre>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-rover">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">html / typescript</span>
+              <button class="copy-btn" data-target="code-rover"><i class="ph ph-copy"></i> Copy</button>
+            </div>
+            <pre id="code-rover"><span class="hl-cm">&lt;!-- Script tag (any HTML page) --&gt;</span>
+&lt;<span class="hl-kw">script</span>&gt;
+  (<span class="hl-kw">function</span>(){
+    <span class="hl-kw">var</span> r = window.rover = window.rover || <span class="hl-kw">function</span>(){
+      (r.q = r.q || []).<span class="hl-fn">push</span>(arguments);
+    };
+    r.l = +<span class="hl-kw">new</span> <span class="hl-fn">Date</span>();
+  })();
+  <span class="hl-fn">rover</span>(<span class="hl-str">'boot'</span>, {
+    siteId: <span class="hl-str">'YOUR_SITE_ID'</span>,
+    publicKey: <span class="hl-str">'pk_site_YOUR_PUBLIC_KEY'</span>,
+    allowedDomains: [<span class="hl-str">'yourdomain.com'</span>],
+  });
+&lt;/<span class="hl-kw">script</span>&gt;
+&lt;<span class="hl-kw">script</span> src=<span class="hl-str">"https://rover.rtrvr.ai/embed.js"</span> async&gt;&lt;/<span class="hl-kw">script</span>&gt;
+
+<span class="hl-cm">// ── React / Next.js (npm) ──────────────</span>
+<span class="hl-kw">import</span> { boot, shutdown } <span class="hl-kw">from</span> <span class="hl-str">'@rtrvr-ai/rover'</span>;
+<span class="hl-kw">import</span> { useEffect } <span class="hl-kw">from</span> <span class="hl-str">'react'</span>;
+
+<span class="hl-kw">export function</span> <span class="hl-fn">RoverWidget</span>() {
+  <span class="hl-fn">useEffect</span>(() =&gt; {
+    <span class="hl-fn">boot</span>({ siteId: <span class="hl-str">'...'</span>, publicKey: <span class="hl-str">'pk_site_...'</span> });
+    <span class="hl-kw">return</span> () =&gt; <span class="hl-fn">shutdown</span>();
+  }, []);
+  <span class="hl-kw">return null</span>;
+}</pre>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-api">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-lang">bash</span>
+              <button class="copy-btn" data-target="code-api"><i class="ph ph-copy"></i> Copy</button>
+            </div>
+            <pre id="code-api"><span class="hl-cm"># ── Agent endpoint ──────────────────────</span>
+<span class="hl-kw">curl</span> -X POST https://api.rtrvr.ai/agent \
+  -H <span class="hl-str">"Authorization: Bearer $RTRVR_API_KEY"</span> \
+  -H <span class="hl-str">"Content-Type: application/json"</span> \
+  -d <span class="hl-str">'{
+    "input": "Extract the top 5 products",
+    "urls": ["https://example.com/products"],
+    "target": "cloud"
+  }'</span>
+
+<span class="hl-cm"># ── Scrape endpoint ─────────────────────</span>
+<span class="hl-kw">curl</span> -X POST https://api.rtrvr.ai/scrape \
+  -H <span class="hl-str">"Authorization: Bearer $RTRVR_API_KEY"</span> \
+  -d <span class="hl-str">'{"urls": ["https://example.com"]}'</span>
+
+<span class="hl-cm"># ── Response shape ──────────────────────</span>
+<span class="hl-cm"># { "result": "...",</span>
+<span class="hl-cm">#   "metadata": { "selectedMode": "cloud" },</span>
+<span class="hl-cm">#   "credits_used": 4 }</span></pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ USE CASES ══════════════ -->
+<section id="usecases" class="section-alt">
+  <div class="container">
+    <div class="section-head fade-up">
+      <div class="label">HACKATHON IDEAS</div>
+      <h2 class="section-title">What will<br><span class="accent">you</span> build?</h2>
+      <p class="section-subtitle">If your agent needs to see, click, or extract anything on the web — <strong>we're your infra.</strong></p>
+    </div>
+    <div class="usecases-grid">
+
+      <div class="usecase-card fade-up">
+        <div class="usecase-card-top">
+          <span class="usecase-num">01</span>
+          <span class="label">CLOUD API</span>
+        </div>
+        <h3>Competitive Intel</h3>
+        <p>"Scrape pricing from 50 competitor sites into a spreadsheet"</p>
+        <div class="usecase-bar"></div>
+      </div>
+
+      <div class="usecase-card fade-up">
+        <div class="usecase-card-top">
+          <span class="usecase-num">02</span>
+          <span class="label">EXTENSION</span>
+        </div>
+        <h3>Lead Generation</h3>
+        <p>"Extract contacts from YC pages, enrich via LinkedIn profiles"</p>
+        <div class="usecase-bar"></div>
+      </div>
+
+      <div class="usecase-card fade-up">
+        <div class="usecase-card-top">
+          <span class="usecase-num">03</span>
+          <span class="label">EXTENSION</span>
+        </div>
+        <h3>Form Automation</h3>
+        <p>"Fill out 100 job applications with my resume, customized per role"</p>
+        <div class="usecase-bar"></div>
+      </div>
+
+      <div class="usecase-card fade-up">
+        <div class="usecase-card-top">
+          <span class="usecase-num">04</span>
+          <span class="label-muted">CLOUD + WEBHOOKS</span>
+        </div>
+        <h3>Price Monitoring</h3>
+        <p>"Track price changes on 200 products, alert my team on Slack"</p>
+        <div class="usecase-bar"></div>
+      </div>
+
+      <div class="usecase-card fade-up">
+        <div class="usecase-card-top">
+          <span class="usecase-num">05</span>
+          <span class="label-muted">MCP + CLAUDE</span>
+        </div>
+        <h3>Research Agent</h3>
+        <p>"Research any topic across the web, compile a structured report"</p>
+        <div class="usecase-bar"></div>
+      </div>
+
+      <div class="usecase-card fade-up">
+        <div class="usecase-card-top">
+          <span class="usecase-num">06</span>
+          <span class="label-muted">ROVER</span>
+        </div>
+        <h3>Agentic Onboarding</h3>
+        <p>"Guide users through complex signups and workflows, click-by-click"</p>
+        <div class="usecase-bar"></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ CREDITS ══════════════ -->
+<section id="credits">
+  <div class="container">
+    <div class="credits-panel fade-up">
+      <div class="credits-left">
+        <div class="label">FREE CREDITS</div>
+        <div class="credits-headline">Start<br><span class="serif">building.</span></div>
+        <div class="credits-dot"></div>
+        <div class="credits-offer">Free credits for every hacker at this event.</div>
+        <div class="credits-sub" style="margin-top:14px">
+          Sign up, grab your API key, and ship something the world hasn't seen yet.<br>
+          <strong>$25 = 2,500 credits ≈ 500+ tasks</strong>
+        </div>
+      </div>
+      <div class="credits-right">
+        <h3>Claim your credits</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Create Account</div>
+              <div class="step-desc">
+                Sign up at <a href="https://rtrvr.ai/cloud" target="_blank" rel="noopener">rtrvr.ai/cloud</a>
+                or install the <a href="https://rtrvr.ai/extension" target="_blank" rel="noopener">Chrome Extension</a>
+              </div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Register on Luma</div>
+              <div class="step-desc">
+                Join the hackathon at <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener">lu.ma/0xgxtpdt</a>
+              </div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Email to Claim</div>
+              <div class="step-desc">
+                Send to <a href="mailto:support@rtrvr.ai?subject=Hackathon%20-%20youremail%40gmail.com">support@rtrvr.ai</a><br>
+                Subject: <code>Hackathon - youremail@gmail.com</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:28px">
+          <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener" class="btn-primary">Register on Luma →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ RESOURCES ══════════════ -->
+<section id="resources" class="section-alt">
+  <div class="container">
+    <div class="section-head fade-up">
+      <div class="label">DOCUMENTATION</div>
+      <h2 class="section-title">Everything<br><span class="accent">you need.</span></h2>
+    </div>
+    <div class="resources-grid">
+
+      <a href="https://rtrvr.ai/docs/api" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-cloud"></i></div>
+        <div><div class="resource-title">REST API Docs</div><div class="resource-url">rtrvr.ai/docs/api</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://rtrvr.ai/docs/cli" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-terminal-window"></i></div>
+        <div><div class="resource-title">CLI &amp; SDK Docs</div><div class="resource-url">rtrvr.ai/docs/cli</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://rtrvr.ai/docs/mcp" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-plugs-connected"></i></div>
+        <div><div class="resource-title">MCP &amp; Browser API</div><div class="resource-url">rtrvr.ai/docs/mcp</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://rtrvr.ai/extension" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-puzzle-piece"></i></div>
+        <div><div class="resource-title">Chrome Extension</div><div class="resource-url">rtrvr.ai/extension</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://rover.rtrvr.ai/workspace" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-robot"></i></div>
+        <div><div class="resource-title">Rover Workspace</div><div class="resource-url">rover.rtrvr.ai/workspace</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://github.com/rtrvr-ai/rtrvr-cli" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-github-logo"></i></div>
+        <div><div class="resource-title">rtrvr-cli GitHub</div><div class="resource-url">github.com/rtrvr-ai/rtrvr-cli</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://www.npmjs.com/package/@rtrvr-ai/cli" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-package"></i></div>
+        <div><div class="resource-title">npm Packages</div><div class="resource-url">@rtrvr-ai/cli · @rtrvr-ai/sdk · @rtrvr-ai/rover</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+      <a href="https://rtrvr.ai/use-cases" target="_blank" rel="noopener" class="resource-card fade-up">
+        <div class="resource-icon"><i class="ph ph-lightning"></i></div>
+        <div><div class="resource-title">Use Cases Gallery</div><div class="resource-url">rtrvr.ai/use-cases</div></div>
+        <i class="ph ph-arrow-up-right resource-arrow"></i>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <img src="https://rtrvr.ai/rtrvrai-logo.png" alt="rtrvr.ai" style="height:24px;margin-bottom:10px" onerror="this.style.display='none'">
+        <div class="footer-brand-name">RTRVR.AI</div>
+        <div class="footer-tagline">
+          The web was built for humans to browse.<br>
+          <span class="accent-line">The agentic web is built for AI to act.</span>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Platform</h4>
+        <a href="https://rover.rtrvr.ai/workspace" target="_blank" rel="noopener">Rover Workspace</a>
+        <a href="https://rtrvr.ai/extension" target="_blank" rel="noopener">Chrome Extension</a>
+        <a href="https://rtrvr.ai/cloud" target="_blank" rel="noopener">Cloud Dashboard</a>
+        <a href="https://rtrvr.ai/pricing" target="_blank" rel="noopener">Pricing</a>
+      </div>
+      <div class="footer-col">
+        <h4>Developers</h4>
+        <a href="https://rtrvr.ai/docs" target="_blank" rel="noopener">Documentation</a>
+        <a href="https://github.com/rtrvr-ai/rtrvr-cli" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.npmjs.com/package/@rtrvr-ai/cli" target="_blank" rel="noopener">npm Packages</a>
+        <a href="https://rtrvr.ai/use-cases" target="_blank" rel="noopener">Use Cases</a>
+      </div>
+      <div class="footer-col">
+        <h4>Hackathon</h4>
+        <a href="https://lu.ma/0xgxtpdt" target="_blank" rel="noopener">Register on Luma</a>
+        <a href="#credits">Claim $25 Credits</a>
+        <a href="mailto:support@rtrvr.ai">support@rtrvr.ai</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2025 rtrvr.ai</span>
+      <div>
+        <a href="https://rtrvr.ai" target="_blank" rel="noopener">RTRVR.AI</a>
+        <span style="margin:0 8px;color:var(--text-faint)">·</span>
+        <a href="https://rover.rtrvr.ai" target="_blank" rel="noopener">ROVER.RTRVR.AI</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- ══════════════ JS ══════════════ -->
+<script>
+  // Nav scroll
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 20);
+  }, { passive: true });
+
+  // Mobile hamburger
+  const hamburger = document.getElementById('hamburger');
+  const navMobile = document.getElementById('nav-mobile');
+  hamburger.addEventListener('click', () => navMobile.classList.toggle('open'));
+  navMobile.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => navMobile.classList.remove('open'));
+  });
+
+  // Copy buttons
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pre = document.getElementById(btn.dataset.target);
+      if (!pre) return;
+      try {
+        await navigator.clipboard.writeText(pre.innerText || pre.textContent);
+        const icon = btn.querySelector('i');
+        const orig = icon.className;
+        icon.className = 'ph ph-check';
+        btn.style.color = '#22C55E';
+        setTimeout(() => { icon.className = orig; btn.style.color = ''; }, 1800);
+      } catch {}
+    });
+  });
+
+  // Fade-in
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+    });
+  }, { threshold: 0.06, rootMargin: '0px 0px -32px 0px' });
+
+  document.querySelectorAll('.fade-up').forEach((el, i) => {
+    el.style.transitionDelay = `${(i % 5) * 50}ms`;
+    observer.observe(el);
+  });
+
+  // Smooth scroll
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', e => {
+      const id = anchor.getAttribute('href').slice(1);
+      const target = document.getElementById(id);
+      if (!target) return;
+      e.preventDefault();
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>
