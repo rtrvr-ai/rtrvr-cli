@@ -17,6 +17,9 @@ export interface StreamExecutionEvent {
   raw: string;
 }
 
+const MAX_SSE_BUFFER_CHARS = 1_048_576;
+const SSE_CONNECT_TIMEOUT_MS = 15_000;
+
 export async function streamExecutionEvents(options: StreamExecutionEventsOptions): Promise<void> {
   const startupDeadline = Date.now() + (options.startupRetryMs ?? 20_000);
   const phase = options.phase ?? 1;
@@ -29,37 +32,79 @@ export async function streamExecutionEvents(options: StreamExecutionEventsOption
       return;
     }
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'text/event-stream',
-        Authorization: `Bearer ${options.token}`,
-      },
-      signal: options.signal,
-    });
+    const request = createStreamController(options.signal);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+          Authorization: `Bearer ${options.token}`,
+        },
+        signal: request.signal,
+      });
+      request.clearConnectDeadline();
+    } catch (error) {
+      request.dispose();
+      throw error;
+    }
 
-    if (!response.ok) {
-      if (
-        (response.status === 404 || response.status === 425 || response.status === 409)
-        && Date.now() < startupDeadline
-      ) {
-        await sleep(600);
-        continue;
+    try {
+      if (!response.ok) {
+        if (
+          (response.status === 404 || response.status === 425 || response.status === 409)
+          && Date.now() < startupDeadline
+        ) {
+          await sleep(600, options.signal);
+          continue;
+        }
+
+        const body = await response.text();
+        throw new Error(
+          `Event stream failed (${response.status}): ${body || response.statusText || 'unknown error'}`,
+        );
       }
 
-      const body = await response.text();
-      throw new Error(
-        `Event stream failed (${response.status}): ${body || response.statusText || 'unknown error'}`,
-      );
-    }
+      if (!response.body) {
+        throw new Error('Event stream response did not include a readable body.');
+      }
 
-    if (!response.body) {
-      throw new Error('Event stream response did not include a readable body.');
+      await consumeEventStream(response.body, options.onEvent, request.signal);
+      return;
+    } finally {
+      request.dispose();
     }
-
-    await consumeEventStream(response.body, options.onEvent, options.signal);
-    return;
   }
+}
+
+function createStreamController(parent?: AbortSignal): {
+  signal: AbortSignal;
+  clearConnectDeadline: () => void;
+  dispose: () => void;
+} {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort(parent?.reason ?? new Error('Event stream cancelled.'));
+  if (parent?.aborted) onAbort();
+  else parent?.addEventListener('abort', onAbort, { once: true });
+  const deadline = setTimeout(
+    () => controller.abort(new Error('Event stream connection timed out.')),
+    SSE_CONNECT_TIMEOUT_MS,
+  );
+  deadline.unref?.();
+  let deadlineCleared = false;
+  const clearConnectDeadline = () => {
+    if (deadlineCleared) return;
+    deadlineCleared = true;
+    clearTimeout(deadline);
+  };
+  return {
+    signal: controller.signal,
+    clearConnectDeadline,
+    dispose: () => {
+      clearConnectDeadline();
+      parent?.removeEventListener('abort', onAbort);
+    },
+  };
 }
 
 function buildEventsUrl(
@@ -88,22 +133,33 @@ async function consumeEventStream(
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    if (signal?.aborted) {
-      return;
+  const onAbort = () => void reader.cancel(signal?.reason).catch(() => undefined);
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > MAX_SSE_BUFFER_CHARS) {
+        await reader.cancel('SSE event exceeded the bounded buffer size.').catch(() => undefined);
+        throw new Error('Event stream sent an oversized or unterminated event.');
+      }
+      buffer = flushBuffer(buffer, onEvent);
     }
 
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-    buffer = flushBuffer(buffer, onEvent);
+    buffer += decoder.decode();
+    flushBuffer(buffer, onEvent);
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+    reader.releaseLock();
   }
-
-  buffer += decoder.decode();
-  flushBuffer(buffer, onEvent);
 }
 
 function flushBuffer(
@@ -185,6 +241,19 @@ function parseEventChunk(chunk: string): StreamExecutionEvent | null {
   };
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
+async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason ?? new Error('Event stream cancelled.')); return; }
+    const cleanup = () => signal?.removeEventListener('abort', onAbort);
+    const onAbort = () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(signal?.reason ?? new Error('Event stream cancelled.'));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
