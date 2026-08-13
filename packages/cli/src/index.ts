@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import readline from 'node:readline/promises';
@@ -160,11 +161,18 @@ const TOOL_SHORTCUTS = {
 } as const;
 
 const program = new Command();
+const cliManifest = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as { version?: unknown };
+const cliVersion = typeof cliManifest.version === 'string' && /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(cliManifest.version)
+  ? cliManifest.version
+  : null;
+if (!cliVersion) throw new Error('Invalid CLI package version');
 
 program
   .name('rtrvr')
   .description('rtrvr.ai CLI: unified cloud + extension runtime for humans and agents.')
-  .version('0.2.1');
+  .version(cliVersion);
 
 registerAuthCommands(program);
 registerExecutionCommands(program);
