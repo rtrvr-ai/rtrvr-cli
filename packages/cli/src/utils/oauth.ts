@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from 'node:crypto';
+
 export interface CliOAuthStartResult {
   protocolVersion: 1 | 2;
   sessionId: string;
@@ -41,12 +43,11 @@ class OAuthHttpError extends Error {
 }
 
 function randomBase64Url(byteLength: number): string {
-  return Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(byteLength))).toString('base64url');
+  return randomBytes(byteLength).toString('base64url');
 }
 
 async function pkceChallenge(verifier: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-  return Buffer.from(digest).toString('base64url');
+  return createHash('sha256').update(verifier).digest('base64url');
 }
 
 export async function startCliOAuth(baseUrl: string): Promise<CliOAuthStartResult> {
