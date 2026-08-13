@@ -1,5 +1,6 @@
 node_modules
 .tmp/
+packages/cli/test/.dist/
 dist
 .pnpm-store
 

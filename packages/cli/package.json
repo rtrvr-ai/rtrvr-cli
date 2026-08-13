@@ -47,7 +47,7 @@
     "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "pnpm run build && pnpm run test:utils && node --test test/*.test.mjs",
-    "test:utils": "tsup src/utils/oauth.ts src/utils/events.ts --format esm --platform node --out-dir ../../.tmp/cli-utils-test --clean",
+    "test:utils": "tsup src/utils/oauth.ts src/utils/events.ts --format esm --platform node --out-dir test/.dist --clean",
     "lint": "echo 'No lint configured for @rtrvr-ai/cli'"
   },
   "dependencies": {

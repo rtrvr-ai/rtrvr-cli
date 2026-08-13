@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { streamExecutionEvents } from '../../../.tmp/cli-utils-test/events.js';
-import { pollCliOAuth, startCliOAuth } from '../../../.tmp/cli-utils-test/oauth.js';
+import { streamExecutionEvents } from './.dist/events.js';
+import { pollCliOAuth, startCliOAuth } from './.dist/oauth.js';
 
 function jsonResponse(status, payload, headers = {}) {
   return new Response(JSON.stringify(payload), {
