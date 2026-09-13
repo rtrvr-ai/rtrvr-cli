@@ -438,6 +438,7 @@ function registerExecutionCommands(root: Command): void {
 
       const result = await client.extension.run({
         input: inputParts.join(' '),
+        clientSurface: 'cli',
         urls: options.url,
         schema,
         fileUrls: options.fileUrl,
@@ -492,6 +493,7 @@ function registerRawCommands(root: Command): void {
         params: {
           ...paramsJson,
           ...paramsFromPairs,
+          client_surface: 'cli',
         },
         deviceId: options.deviceId,
       });
@@ -523,6 +525,7 @@ function registerRawCommands(root: Command): void {
             schema,
             file_urls: options.fileUrl,
             ...extra,
+            client_surface: 'cli',
           },
           deviceId: options.deviceId,
         });
@@ -915,6 +918,7 @@ function registerSkillsCommands(root: Command): void {
       }
 
       const request = buildRunRequestFromSkill(skill, inputParts.join(' '), options.url);
+      request.clientSurface = 'cli';
       const target = resolveTargetSelection(options.target, options.cloud, options.extension);
       if (target) {
         request.target = target;
@@ -1717,6 +1721,7 @@ async function buildRunRequest(inputText: string, options: CommonRunOptions): Pr
   const target = resolveTargetSelection(options.target, options.cloud, options.extension);
   return {
     input: inputText,
+    clientSurface: 'cli',
     urls: options.url,
     target,
     deviceId: options.deviceId,

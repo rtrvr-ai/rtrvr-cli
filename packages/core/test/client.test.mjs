@@ -97,6 +97,39 @@ test('run defaults to cloud /agent when auto target and no extension devices are
   assert.equal(calls[1].url, 'https://api.test.rtrvr.ai/agent');
 });
 
+test('run carries the closed CLI analytics surface through cloud and extension routes', async () => {
+  const cloudCalls = [];
+  const cloudClient = new RtrvrClient({
+    apiKey: 'rtrvr_test_key',
+    cloudBaseUrl: 'https://api.test.rtrvr.ai',
+    mcpBaseUrl: 'https://mcp.test.rtrvr.ai',
+    fetchImpl: async (url, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      cloudCalls.push({ url: String(url), body });
+      return jsonResponse({ ok: true });
+    },
+  });
+
+  await cloudClient.run({ input: 'cloud from CLI', target: 'cloud', clientSurface: 'cli' });
+  assert.equal(cloudCalls[0].body.clientSurface, 'cli');
+
+  const extensionCalls = [];
+  const extensionClient = new RtrvrClient({
+    apiKey: 'rtrvr_test_key',
+    mcpBaseUrl: 'https://mcp.test.rtrvr.ai',
+    fetchImpl: async (url, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      extensionCalls.push({ url: String(url), body });
+      return jsonResponse({ success: true, data: { completed: true } });
+    },
+  });
+
+  await extensionClient.run({ input: 'device from CLI', target: 'extension', clientSurface: 'cli' });
+  assert.equal(extensionCalls[0].body.params.client_surface, 'cli');
+  await extensionClient.extensionPlannerRun({ input: 'direct device from CLI', clientSurface: 'cli' });
+  assert.equal(extensionCalls[1].body.params.client_surface, 'cli');
+});
+
 test('run prefers extension planner when extension is online in auto mode', async () => {
   const calls = [];
 
