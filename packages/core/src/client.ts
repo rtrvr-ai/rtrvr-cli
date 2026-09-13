@@ -228,6 +228,7 @@ export class RtrvrClient {
         schema: request.schema,
         file_urls: request.fileUrls,
         ...(request.params ?? {}),
+        ...(request.clientSurface ? { client_surface: request.clientSurface } : {}),
       },
       deviceId: request.deviceId,
     });
@@ -514,6 +515,7 @@ function toAgentRequest(request: UnifiedRunRequest): AgentRequest {
 
   return {
     input: request.input,
+    clientSurface: request.clientSurface,
     urls: request.urls,
     schema: request.schema,
     files,
@@ -554,6 +556,7 @@ function toExtensionPlannerRequest(request: UnifiedRunRequest): ExtensionPlanner
 
   const params = {
     ...(request.extensionParams ?? {}),
+    ...(request.clientSurface ? { client_surface: request.clientSurface } : {}),
     ...(request.trajectoryId ? { trajectoryId: request.trajectoryId } : {}),
     ...(request.phase !== undefined ? { phase: request.phase } : {}),
     ...(request.authToken ? { authToken: request.authToken } : {}),

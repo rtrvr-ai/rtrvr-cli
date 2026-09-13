@@ -28,6 +28,8 @@ export interface WebhookSubscription {
 
 export interface AgentRequest {
   input: string;
+  /** Analytics-only product origin. It never changes authorization or routing. */
+  clientSurface?: 'cli';
   urls?: string[];
   schema?: Record<string, unknown>;
   files?: CloudFile[];
@@ -67,6 +69,8 @@ export interface UnifiedScrapeRequest extends ScrapeRequest {
 
 export interface ExtensionPlannerRequest {
   input: string;
+  /** Analytics-only product origin. It never changes authorization or routing. */
+  clientSurface?: 'cli';
   urls?: string[];
   schema?: Record<string, unknown>;
   fileUrls?: string[];
@@ -82,6 +86,8 @@ export interface ToolRequest {
 
 export interface UnifiedRunRequest {
   input: string;
+  /** Analytics-only product origin. It never changes authorization or routing. */
+  clientSurface?: 'cli';
   urls?: string[];
   schema?: Record<string, unknown>;
   files?: CloudFile[];
