@@ -1,7 +1,7 @@
 {
   "name": "@rtrvr-ai/cli",
-  "version": "0.2.3",
-  "description": "Official rtrvr CLI \u2014 browser automation for AI agents and humans",
+  "version": "0.3.0",
+  "description": "Official rtrvr CLI: browser automation for AI agents and humans",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

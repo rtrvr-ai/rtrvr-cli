@@ -6,9 +6,9 @@
 
 Browser automation for AI agents and humans. One CLI, three execution modes: cloud, local browser extension, or auto-routed.
 
-- **Cloud mode** — run agents and scrape pages via rtrvr's cloud infrastructure
-- **Extension mode** — route to your local browser extension for authenticated sessions
-- **Auto mode** — smart routing with automatic fallback between cloud and extension
+- **Cloud mode**: run agents and scrape pages via rtrvr's cloud infrastructure
+- **Extension mode**: route to your local browser extension for authenticated sessions
+- **Auto mode**: smart routing with automatic fallback between cloud and extension
 
 ## Install
 
@@ -97,7 +97,7 @@ echo "Summarize this page" | rtrvr run --url https://example.com
 | `--device-id <id>` | Target a specific browser extension device |
 | `--schema-file <path>` | JSON schema for structured output |
 | `--json` | Machine-readable JSON output |
-| `--no-stream` | Disable real-time progress streaming |
+| `--no-stream` | Hide live progress; async completion still follows the run |
 
 ### `rtrvr scrape`
 
@@ -282,7 +282,19 @@ rtrvr run "Complex multi-step task" --url https://example.com
 rtrvr run "Quick task" --url https://example.com --no-stream
 ```
 
-Events include: `planner_step`, `tool_start`, `tool_progress`, `tool_complete`, `credits_update`, and more.
+Events include `planner_step`, `tool_start`, `tool_progress`, `tool_complete` and `credits_update`, depending on the cloud and tools in use. JSON mode sends progress to stderr and the final result to stdout. Progress respects pipe backpressure instead of queuing event history.
+
+Version 0.3.0 sends `Prefer: respond-async`. A server that returns HTTP 202 lets the client follow the run through the MCP events relay. Closed or dropped streams reconnect with `since` set to the last durable event sequence. The client reads the full final response after completion. If a progress frame exceeds its byte envelope, a typed repair resumes with status only and preserves the full final response. A server that returns HTTP 200 keeps its existing final-response behavior.
+
+`--no-stream` hides progress. Async runs still follow events to completion. Ctrl-C requests cloud cancellation and waits up to 10 seconds for acknowledgement, then exits with code 130. The server's run limit governs execution. The default client wait covers 45 minutes; SDK callers can set an explicit `timeoutMs` for their wait.
+
+## Retries and errors
+
+Every cloud agent and scrape call sends a `trajectoryId` and matching `Idempotency-Key`, including calls with `--no-stream`. Retries reuse that identity. For SDK retries across separate calls, keep the same `trajectoryId` and request body. The server must support the idempotency contract; older servers may reject a repeated id instead of replaying its result.
+
+On HTTP 429 or 503, `Retry-After` can specify seconds or an HTTP date. The client waits at least that long if its deadline permits another attempt. Retry waits and event reconnects share the call's deadline.
+
+Errors include the server's code, offending fields and requestId when supplied. SDK errors expose these as `RtrvrError.code`, `.fields` and `.requestId`. Retained partial results stay available in `.details` and CLI error output.
 
 ## Configuration
 
