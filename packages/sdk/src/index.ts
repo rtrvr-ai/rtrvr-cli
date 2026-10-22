@@ -56,6 +56,9 @@ export function createRtrvrClient(options: ClientOptions): RtrvrSdk {
       run: (request) => raw.agent(request),
       cloud: (request) => raw.agentRun({
         input: request.input,
+        signal: request.signal,
+        onEvent: request.onEvent,
+        includeEventOutput: request.includeEventOutput,
         clientSurface: request.clientSurface,
         urls: request.urls,
         schema: request.schema,

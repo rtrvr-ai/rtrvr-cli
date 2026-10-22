@@ -52,3 +52,13 @@ export function retryAfterMs(value: string | null): number | undefined {
   const date = Date.parse(value);
   return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 }
+
+export function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', onAbort);
+    const onAbort = () => { cleanup(); reject(signal.reason); };
+    promise.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  });
+}

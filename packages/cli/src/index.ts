@@ -10,6 +10,7 @@ import { stdin as input, stdout as output } from 'node:process';
 import { Command } from 'commander';
 import {
   createRtrvrClient,
+  RtrvrError,
   isSupportedAuthToken,
   type RunMode,
   type UnifiedRunRequest,
@@ -27,7 +28,7 @@ import {
   type AuthStorageMode,
   type CliConfig,
 } from './utils/config.js';
-import { printError, printHuman, printJson, printKeyValue, printLine } from './utils/output.js';
+import { printError, printHuman, printJson, printKeyValue, printLine, writeProgress, exitAfterAbort } from './utils/output.js';
 import { maybeReadJsonFile, parseJsonText, parseKeyValuePairs } from './utils/parsers.js';
 import {
   addSkillFromFile,
@@ -49,7 +50,7 @@ import {
   type SecureStoreBackend,
 } from './utils/secrets.js';
 import { pollCliOAuth, startCliOAuth } from './utils/oauth.js';
-import { streamExecutionEvents, type StreamExecutionEvent } from './utils/events.js';
+import type { StreamExecutionEvent } from './utils/events.js';
 
 type CliSdk = ReturnType<typeof createRtrvrClient>;
 type AuthSource = 'env' | 'keychain' | 'secret-service' | 'config' | 'none';
@@ -187,7 +188,8 @@ registerRawCommands(raw);
 
 program.parseAsync(process.argv).catch((error) => {
   printError(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+  if (process.exitCode !== 130) process.exitCode = 1;
+  if (process.exitCode !== 130 && error instanceof RtrvrError && error.code === 'REQUEST_DEADLINE') exitAfterAbort(1);
 });
 
 function registerAuthCommands(root: Command): void {
@@ -292,17 +294,12 @@ function registerExecutionCommands(root: Command): void {
         assertCloudTokenForCloudEndpoints(token, '`rtrvr run --stream` (cloud mode)');
       }
 
-      const result = options.stream
-        ? await executeWithEventStream({
-          baseUrl: config.mcpBaseUrl,
-          token,
-          includeOutput: Boolean(options.streamOutput),
-          jsonMode: options.json,
-          requestLabel: 'run',
-          ...prepareStreamRequest(request),
-          execute: () => client.run(request),
-        })
-        : await client.run(request);
+      const result = await executeRun({
+        request, stream: Boolean(options.stream),
+        includeOutput: Boolean(options.streamOutput),
+        jsonMode: options.json,
+        execute: () => client.run(request),
+      });
       emitOutput(result, options.json);
     });
 
@@ -345,17 +342,12 @@ function registerExecutionCommands(root: Command): void {
         assertCloudTokenForCloudEndpoints(token, '`rtrvr agent --stream` (cloud mode)');
       }
 
-      const result = options.stream
-        ? await executeWithEventStream({
-          baseUrl: config.mcpBaseUrl,
-          token,
-          includeOutput: Boolean(options.streamOutput),
-          jsonMode: options.json,
-          requestLabel: 'agent',
-          ...prepareStreamRequest(request),
-          execute: () => client.agent.run(request),
-        })
-        : await client.agent.run(request);
+      const result = await executeRun({
+        request, stream: Boolean(options.stream),
+        includeOutput: Boolean(options.streamOutput),
+        jsonMode: options.json,
+        execute: () => client.agent.run(request),
+      });
 
       emitOutput(result, options.json);
     });
@@ -409,17 +401,12 @@ function registerExecutionCommands(root: Command): void {
         assertCloudTokenForCloudEndpoints(auth.token as string, '`rtrvr scrape --stream` (cloud mode)');
       }
 
-      const result = options.stream
-        ? await executeWithEventStream({
-          baseUrl: config.mcpBaseUrl,
-          token: auth.token as string,
-          includeOutput: Boolean(options.streamOutput),
-          jsonMode: options.json,
-          requestLabel: 'scrape',
-          ...prepareScrapeStreamRequest(request),
-          execute: () => client.scrape.route(request),
-        })
-        : await client.scrape.route(request);
+      const result = await executeRun({
+        request, stream: Boolean(options.stream),
+        includeOutput: Boolean(options.streamOutput),
+        jsonMode: options.json,
+        execute: () => client.scrape.route(request),
+      });
       emitOutput(result, options.json);
     });
 
@@ -923,7 +910,8 @@ function registerSkillsCommands(root: Command): void {
       if (target) {
         request.target = target;
       }
-      emitOutput(await client.run(request), options.json);
+      const result = await executeRun({ request, stream: false, includeOutput: false, execute: () => client.run(request) });
+      emitOutput(result, options.json);
     });
 }
 
@@ -1447,63 +1435,46 @@ function prepareScrapeStreamRequest(request: StreamableUnifiedScrapeRequest): { 
   return { trajectoryId, phase: 1 };
 }
 
-async function executeWithEventStream<T>(args: {
-  baseUrl: string;
-  token: string;
-  trajectoryId: string;
-  phase: number;
+async function executeRun<T>(args: {
+  request: UnifiedRunRequest | UnifiedScrapeRequest;
+  stream: boolean;
   includeOutput: boolean;
   jsonMode?: boolean;
-  requestLabel: string;
   execute: () => Promise<T>;
 }): Promise<T> {
-  const streamAbortController = new AbortController();
-  let streamWarning: string | undefined;
-
-  const streamPromise = streamExecutionEvents({
-    baseUrl: args.baseUrl,
-    token: args.token,
-    trajectoryId: args.trajectoryId,
-    phase: args.phase,
-    includeOutput: args.includeOutput,
-    signal: streamAbortController.signal,
-    onEvent: (event) => {
-      const rendered = renderStreamEvent(event, args.includeOutput);
-      if (!rendered) {
-        return;
-      }
-
-      if (args.jsonMode) {
-        process.stderr.write(
-          `${JSON.stringify({ stream: { event: event.event, id: event.id, data: event.data } })}\n`,
-        );
-      } else {
-        printLine(`[stream] ${rendered}`);
-      }
-    },
-  }).catch((error: unknown) => {
-    if (streamAbortController.signal.aborted) {
-      return;
-    }
-    streamWarning = toErrorMessage(error);
-  });
-
-  try {
-    return await args.execute();
-  } finally {
-    streamAbortController.abort();
-    await streamPromise;
-    if (streamWarning) {
-      printError(
-        `Progress stream for ${args.requestLabel} was unavailable (${streamWarning}). Final response is still valid.`,
-      );
-    }
+  if (args.stream) {
+    if ('input' in args.request) prepareStreamRequest(args.request);
+    else prepareScrapeStreamRequest(args.request);
+  } else args.request.trajectoryId ??= randomUUID();
+  const controller = new AbortController();
+  const onInterrupt = () => {
+    process.exitCode = 130;
+    controller.abort(new Error('Run cancelled by Ctrl-C.'));
+  };
+  process.on('SIGINT', onInterrupt);
+  args.request.signal = controller.signal;
+  args.request.includeEventOutput = args.stream && args.includeOutput;
+  if (args.stream) args.request.onEvent = (event, signal) => {
+    const rendered = renderStreamEvent(event, args.includeOutput);
+    if (!rendered) return;
+    if (args.jsonMode) return writeProgress(process.stderr, `${JSON.stringify({ stream: { event: event.event, id: event.id, data: event.data } })}\n`, signal);
+    return writeProgress(process.stdout, `[stream] ${rendered}\n`, signal);
+  };
+  try { return await args.execute(); }
+  finally {
+    process.removeListener('SIGINT', onInterrupt);
+    if (controller.signal.aborted) exitAfterAbort(130);
   }
 }
 
 function renderStreamEvent(event: StreamExecutionEvent, includeOutput: boolean): string | undefined {
   const root = ensureRecord(event.data);
   const payload = ensureRecord(root.data);
+
+  if (event.event === 'stream_repair') {
+    const repair = ensureRecord(root.repair);
+    return `progress repair ${String(root.code)}: received at least ${String(repair.actualAtLeastBytes)} bytes, ceiling ${String(repair.ceilingBytes)} bytes; resuming with status only.`;
+  }
 
   if (event.event === 'ready') {
     return `connected to execution ${String(root.trajectoryId || '')}`.trim();
@@ -1673,7 +1644,7 @@ function previewStreamOutput(output: unknown): string | undefined {
   }
 
   if (typeof output === 'string') {
-    return output.length > 180 ? `${output.slice(0, 180)}...` : output;
+    return output;
   }
 
   try {
@@ -1681,7 +1652,7 @@ function previewStreamOutput(output: unknown): string | undefined {
     if (!serialized) {
       return undefined;
     }
-    return serialized.length > 180 ? `${serialized.slice(0, 180)}...` : serialized;
+    return serialized;
   } catch {
     return '[unserializable output]';
   }

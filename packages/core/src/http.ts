@@ -18,6 +18,7 @@ export interface JsonRequestOptions {
   signal?: AbortSignal;
   headers?: Record<string, string>;
   timeoutMs?: number;
+  onResponse?: (response: Response) => void;
 }
 
 export class HttpClient {
@@ -99,6 +100,7 @@ export class HttpClient {
         });
       }
 
+      options.onResponse?.(response);
       return enrichPayloadMetadata(payload, requestId, attempt) as T;
     } catch (error) {
       if (error instanceof RtrvrError) {
