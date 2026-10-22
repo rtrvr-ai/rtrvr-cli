@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_CLOUD_BASE_URL,
   DEFAULT_CONTROL_BASE_URL,
@@ -77,10 +78,12 @@ export class RtrvrClient {
       throw new RtrvrError('`input` is required for agent runs.');
     }
 
+    const trajectoryId = request.trajectoryId ?? randomUUID();
     return this.http.requestJson<unknown>({
+      headers: { 'Idempotency-Key': trajectoryId },
       url: `${this.cloudBaseUrl}/agent`,
       method: 'POST',
-      body: request,
+      body: { ...request, trajectoryId },
     });
   }
 
@@ -91,10 +94,12 @@ export class RtrvrClient {
       throw new RtrvrError('`urls` is required for scrape runs.');
     }
 
+    const trajectoryId = request.trajectoryId ?? randomUUID();
     return this.http.requestJson<unknown>({
+      headers: { 'Idempotency-Key': trajectoryId },
       url: `${this.cloudBaseUrl}/scrape`,
       method: 'POST',
-      body: request,
+      body: { ...request, trajectoryId },
     });
   }
 

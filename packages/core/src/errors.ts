@@ -3,6 +3,7 @@ export class RtrvrError extends Error {
   public readonly requestId?: string;
   public readonly code?: string;
   public readonly details?: unknown;
+  public readonly retryAfterMs?: number;
 
   constructor(
     message: string,
@@ -11,6 +12,7 @@ export class RtrvrError extends Error {
       requestId?: string;
       code?: string;
       details?: unknown;
+      retryAfterMs?: number;
       cause?: unknown;
     },
   ) {
@@ -20,6 +22,7 @@ export class RtrvrError extends Error {
     this.requestId = options?.requestId;
     this.code = options?.code;
     this.details = options?.details;
+    this.retryAfterMs = options?.retryAfterMs;
 
     if (options?.cause) {
       (this as Error & { cause?: unknown }).cause = options.cause;
