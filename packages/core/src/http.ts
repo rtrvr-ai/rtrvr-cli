@@ -1,5 +1,5 @@
 import { DEFAULT_TIMEOUT_MS } from './constants.js';
-import { RtrvrError } from './errors.js';
+import { RtrvrError, serverErrorFromPayload, serverRequestId } from './errors.js';
 import { createDeadline, retryAfterMs, wait } from './deadline.js';
 import type { RetryPolicy } from './types.js';
 
@@ -60,7 +60,7 @@ export class HttpClient {
           if (!(error instanceof RtrvrError) || !shouldRetry(error, attempt, this.retryPolicy, deadline.signal)) throw error;
           const delay = Math.max(backoffDelayMs(attempt, this.retryPolicy), error.retryAfterMs ?? 0);
           if (delay >= deadline.remaining()) {
-            throw new RtrvrError('Retry delay exceeds the request deadline.', { code: 'REQUEST_DEADLINE', cause: error });
+            throw new RtrvrError('Retry delay exceeds the request deadline.', { code: 'REQUEST_DEADLINE', requestId: error.requestId, fields: error.fields, details: error.details, cause: error });
           }
           await wait(delay, deadline.signal);
         }
@@ -83,20 +83,18 @@ export class HttpClient {
         signal: options.signal,
       });
 
-      const requestId = response.headers.get('x-request-id') ?? undefined;
+      const headerRequestId = response.headers.get('x-request-id') ?? undefined;
       const text = await response.text();
 
       const payload = text.length > 0
         ? parseJsonSafely(text)
         : undefined;
 
+      const requestId = serverRequestId(payload, headerRequestId);
       if (!response.ok) {
-        const message = extractErrorMessage(payload) ?? `HTTP ${response.status}`;
-        throw new RtrvrError(message, {
-          status: response.status,
+        throw serverErrorFromPayload(payload, {
+          status: response.status, requestId,
           retryAfterMs: response.status === 429 || response.status === 503 ? retryAfterMs(response.headers.get('retry-after')) : undefined,
-          requestId,
-          details: payload,
         });
       }
 
@@ -197,38 +195,4 @@ function parseJsonSafely(text: string): unknown {
       raw: text,
     };
   }
-}
-
-function extractErrorMessage(payload: unknown): string | undefined {
-  if (payload === null || payload === undefined) {
-    return undefined;
-  }
-
-  if (typeof payload === 'string') {
-    return payload;
-  }
-
-  if (typeof payload !== 'object') {
-    return undefined;
-  }
-
-  const asRecord = payload as Record<string, unknown>;
-
-  if (typeof asRecord.message === 'string') {
-    return asRecord.message;
-  }
-
-  if (
-    typeof asRecord.error === 'object' &&
-    asRecord.error !== null &&
-    typeof (asRecord.error as Record<string, unknown>).message === 'string'
-  ) {
-    return (asRecord.error as Record<string, string>).message;
-  }
-
-  if (typeof asRecord.error === 'string') {
-    return asRecord.error;
-  }
-
-  return undefined;
 }

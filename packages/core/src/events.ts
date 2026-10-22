@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { DEFAULT_TIMEOUT_MS } from './constants.js';
 import { createDeadline, retryAfterMs, wait, untilAborted } from './deadline.js';
-import { RtrvrError } from './errors.js';
+import { RtrvrError, serverErrorFromPayload } from './errors.js';
 
 export interface StreamExecutionEvent {
   id?: string;
@@ -73,10 +73,11 @@ export async function streamExecutionEvents(options: StreamExecutionEventsOption
           method: 'GET', headers: { Accept: 'text/event-stream', Authorization: `Bearer ${options.token}` }, signal: deadline.signal,
         });
         if (!response.ok) {
-          void response.body?.cancel().catch(() => undefined);
           if (![404, 409, 425, 429, 500, 502, 503, 504].includes(response.status)) {
-            throw new RtrvrError(`Event stream failed (${response.status}).`, { status: response.status, code: 'EVENT_STREAM_REFUSED' });
+            const payload = await readStreamError(response, deadline.signal, deadline.remaining);
+            throw serverErrorFromPayload(payload, { status: response.status, requestId: response.headers.get('x-request-id') ?? undefined });
           }
+          void response.body?.cancel().catch(() => undefined);
           if (response.status === 429 || response.status === 503) delay = Math.max(delay, retryAfterMs(response.headers.get('retry-after')) ?? 0);
         } else {
           if (!response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
@@ -202,4 +203,26 @@ function oversizedEvent(actualAtLeastBytes: number): RtrvrError {
   return new RtrvrError('Event stream sent an oversized or unterminated event.', {
     code: 'SSE_EVENT_TOO_LARGE', details: { ceilingBytes: MAX_SSE_EVENT_BYTES, actualAtLeastBytes, repair: { kind: 'wire_bytes', basis: 'normalized_utf8_frame_buffer', ceilingBytes: MAX_SSE_EVENT_BYTES, actualAtLeastBytes } },
   });
+}
+
+async function readStreamError(response: Response, signal: AbortSignal, remaining: () => number): Promise<unknown> {
+  if (!response.body) return undefined;
+  const reader = response.body.getReader();
+  const bytes = Buffer.allocUnsafe(MAX_SSE_EVENT_BYTES);
+  let used = 0;
+  const abort = () => void reader.cancel(signal.reason).catch(() => undefined);
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      if (remaining() <= 0) throw new RtrvrError('Run deadline exceeded while reading an error.', { code: 'REQUEST_DEADLINE' });
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      if (used + value.byteLength > bytes.byteLength) throw oversizedEvent(used + value.byteLength);
+      bytes.set(value, used); used += value.byteLength;
+    }
+    const raw = bytes.toString('utf8', 0, used);
+    try { return JSON.parse(raw); } catch { return raw; }
+  } finally { signal.removeEventListener('abort', abort); void reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }

@@ -7,7 +7,7 @@ import {
   TOOL_NAMES,
   DEFAULT_TIMEOUT_MS,
 } from './constants.js';
-import { isNoDeviceError, isSupportedAuthToken, RtrvrError } from './errors.js';
+import { isNoDeviceError, isSupportedAuthToken, RtrvrError, serverErrorFromPayload } from './errors.js';
 import { HttpClient } from './http.js';
 import { createDeadline } from './deadline.js';
 import { streamExecutionEvents, record, type StreamExecutionEvent } from './events.js';
@@ -34,6 +34,8 @@ interface DirectApiResponse<T = unknown> {
   data?: T;
   error?: {
     message?: string;
+    code?: string;
+    fields?: unknown;
     details?: unknown;
   };
   metadata?: {
@@ -96,7 +98,10 @@ export class RtrvrClient {
   }
 
   private async cloudRun(kind: 'agent' | 'scrape', request: AgentRequest | ScrapeRequest): Promise<unknown> {
-    const { signal, onEvent, includeEventOutput, ...wire } = request;
+    const { signal, onEvent, includeEventOutput, target: _target, preferExtension: _preferExtension,
+      requireLocalSession: _requireLocalSession, deviceId: _deviceId, ...wire } = request as (AgentRequest | ScrapeRequest) & {
+        target?: RunMode; preferExtension?: boolean; requireLocalSession?: boolean; deviceId?: string;
+      };
     const trajectoryId = request.trajectoryId ?? randomUUID();
     const deadline = createDeadline(this.timeoutMs, signal);
     let progressAbort = new AbortController();
@@ -157,6 +162,7 @@ export class RtrvrClient {
       if (partialResult !== undefined) throw new RtrvrError(failure instanceof Error ? failure.message : 'Run follow failed.', {
         code: failure instanceof RtrvrError ? failure.code : 'RUN_FOLLOW_FAILED',
         status: failure instanceof RtrvrError ? failure.status : undefined,
+        fields: failure instanceof RtrvrError ? failure.fields : undefined,
         requestId: failure instanceof RtrvrError ? failure.requestId : undefined,
         details: { trajectoryId: executionId, partialResult: failure instanceof RtrvrError ? record(failure.details).partialResult ?? partialResult : partialResult, failure: failure instanceof RtrvrError ? failure.details : undefined }, cause: failure,
       });
@@ -333,8 +339,8 @@ export class RtrvrClient {
     });
 
     if (!response.success) {
-      throw new RtrvrError(response.error?.message ?? `Tool '${tool}' failed`, {
-        details: response,
+      throw serverErrorFromPayload(response, {
+        requestId: response.metadata?.requestId, fallbackMessage: `Tool '${tool}' failed`,
       });
     }
 

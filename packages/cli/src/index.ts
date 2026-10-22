@@ -11,6 +11,7 @@ import { Command } from 'commander';
 import {
   createRtrvrClient,
   RtrvrError,
+  formatRtrvrError,
   isSupportedAuthToken,
   type RunMode,
   type UnifiedRunRequest,
@@ -187,7 +188,7 @@ const raw = program.command('raw').description('Raw/low-level MCP tool commands.
 registerRawCommands(raw);
 
 program.parseAsync(process.argv).catch((error) => {
-  printError(error instanceof Error ? error.message : String(error));
+  printError(formatRtrvrError(error));
   if (process.exitCode !== 130) process.exitCode = 1;
   if (process.exitCode !== 130 && error instanceof RtrvrError && error.code === 'REQUEST_DEADLINE') exitAfterAbort(1);
 });
