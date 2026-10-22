@@ -29,7 +29,7 @@ import {
   type AuthStorageMode,
   type CliConfig,
 } from './utils/config.js';
-import { printError, printHuman, printJson, printKeyValue, printLine, writeProgress, exitAfterAbort } from './utils/output.js';
+import { finalRunExitCode, printError, printHuman, printJson, printKeyValue, printLine, writeProgress, exitAfterAbort } from './utils/output.js';
 import { maybeReadJsonFile, parseJsonText, parseKeyValuePairs } from './utils/parsers.js';
 import {
   addSkillFromFile,
@@ -302,6 +302,7 @@ function registerExecutionCommands(root: Command): void {
         execute: () => client.run(request),
       });
       emitOutput(result, options.json);
+      process.exitCode ||= finalRunExitCode(result);
     });
 
   root
@@ -351,6 +352,7 @@ function registerExecutionCommands(root: Command): void {
       });
 
       emitOutput(result, options.json);
+      process.exitCode ||= finalRunExitCode(result);
     });
 
   root
@@ -409,6 +411,7 @@ function registerExecutionCommands(root: Command): void {
         execute: () => client.scrape.route(request),
       });
       emitOutput(result, options.json);
+      process.exitCode ||= finalRunExitCode(result);
     });
 
   root
@@ -913,6 +916,7 @@ function registerSkillsCommands(root: Command): void {
       }
       const result = await executeRun({ request, stream: false, includeOutput: false, execute: () => client.run(request) });
       emitOutput(result, options.json);
+      process.exitCode ||= finalRunExitCode(result);
     });
 }
 

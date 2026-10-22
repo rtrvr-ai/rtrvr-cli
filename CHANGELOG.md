@@ -2,6 +2,8 @@
 
 ## 0.3.0 (unreleased)
 
+- Pipeline change, subject to the founder's decision: CLI run, agent, scrape and skills apply commands exit 1 when the final run is error, failed or cancelled. Final and partial output is printed before the exit status is set.
+
 - Cloud agent and scrape retries use the run's trajectoryId as Idempotency-Key, including CLI `--no-stream` and SDK calls. Retries preserve one admission identity instead of starting another run.
 - HTTP 429 and 503 honor Retry-After in seconds or HTTP-date form within the caller's deadline.
 - Request asynchronous execution and resume the MCP events relay from the last durable sequence after a stream ends or drops. HTTP 200 keeps the existing final-result path when a server ignores the preference.

@@ -95,3 +95,12 @@ for (const command of ['run', 'scrape']) {
     assert.equal(signal, null); assert.equal(code, 130); assert.equal(acknowledged, true); assert.ok(stderr.includes('Ctrl-C'));
   });
 }
+
+for (const status of ['error', 'failed', 'cancelled', 'partial']) {
+  test(`CLI final ${status} exits nonzero and preserves output`, async t => {
+    const server = await fake(t, async (_req, res) => json(res, { status, ...(status === 'partial' ? { run: { state: 'failed' } } : {}), output: ['retained partial answer'] }));
+    await assert.rejects(execute(process.execPath, [cli, 'run', '--cloud', '--no-stream', '--json', 'task'], { env: server.env, timeout: 8000 }), error => {
+      assert.equal(error.code, 1); assert.deepEqual(JSON.parse(error.stdout).data.output, ['retained partial answer']); return true;
+    });
+  });
+}

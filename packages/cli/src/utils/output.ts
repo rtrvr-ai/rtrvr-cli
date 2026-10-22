@@ -181,3 +181,11 @@ export function writeProgress(stream: Writable, text: string, signal: AbortSigna
   signal.throwIfAborted();
   if (!stream.write(text)) return once(stream, 'drain', { signal });
 }
+
+export function finalRunExitCode(value: unknown): 0 | 1 {
+  const root = asRecord(value);
+  const result = asRecord(root?.data) ?? root;
+  if (!result) return 0;
+  const statuses = [result.status, asRecord(result.run)?.state, asRecord(result.terminalResult)?.status];
+  return statuses.some(status => status === 'error' || status === 'failed' || status === 'cancelled') ? 1 : 0;
+}
