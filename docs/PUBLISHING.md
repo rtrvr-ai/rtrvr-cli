@@ -10,7 +10,9 @@ Guide for publishing `@rtrvr-ai/core`, `@rtrvr-ai/sdk`, and `@rtrvr-ai/cli` to n
 | `@rtrvr-ai/sdk` | [npmjs.com/package/@rtrvr-ai/sdk](https://www.npmjs.com/package/@rtrvr-ai/sdk) | High-level SDK wrapper |
 | `@rtrvr-ai/cli` | [npmjs.com/package/@rtrvr-ai/cli](https://www.npmjs.com/package/@rtrvr-ai/cli) | CLI binary (`rtrvr` command) |
 
-Dependency chain: `cli` -> `sdk` -> `core`. Publish in that order.
+Dependency chain: `cli` -> `sdk` -> `core`. Publish dependencies first: `core`, then `sdk`, then `cli`.
+
+The founder merges and publishes the 0.3.0 release. Review [CHANGELOG.md](../CHANGELOG.md), including the separate pipeline exit-code decision, before publishing.
 
 ## Prerequisites
 
@@ -33,7 +35,7 @@ All three packages must use the same version.
 pnpm -r exec -- npm version patch --no-git-tag-version
 
 # Or set a specific version
-pnpm -r exec -- npm version 0.2.1 --no-git-tag-version
+pnpm -r exec -- npm version 0.3.0 --no-git-tag-version
 
 # Also bump root package.json
 npm version patch --no-git-tag-version
@@ -71,8 +73,8 @@ cd packages/cli && pnpm publish --access public && cd ../..
 
 ```bash
 git add -A
-git commit -m "v0.1.1"
-git tag v0.1.1
+git commit -m "v0.3.0"
+git tag v0.3.0
 git push && git push --tags
 ```
 
@@ -80,8 +82,8 @@ git push && git push --tags
 
 Automated publishing is configured in `.github/workflows/publish.yml`. It runs on:
 
-- **GitHub Release creation** — create a release in the GitHub UI or via `gh`
-- **Manual dispatch** — trigger from the Actions tab
+- **GitHub Release creation**: create a release in the GitHub UI or via `gh`
+- **Manual dispatch**: trigger from the Actions tab
 
 ### Setup (one-time)
 
@@ -95,10 +97,10 @@ Automated publishing is configured in `.github/workflows/publish.yml`. It runs o
 
 ```bash
 # Option A: GitHub CLI
-gh release create v0.1.1 --title "v0.1.1" --notes "Bug fixes and test improvements"
+gh release create v0.3.0 --title "v0.3.0" --notes "Bug fixes and test improvements"
 
 # Option B: GitHub UI
-# Go to repo > Releases > Draft a new release > Tag: v0.1.1
+# Go to repo > Releases > Draft a new release > Tag: v0.3.0
 ```
 
 The workflow will:
@@ -110,7 +112,7 @@ The workflow will:
 
 ```bash
 # Set prerelease version
-pnpm -r exec -- npm version 0.2.1-beta.1 --no-git-tag-version
+pnpm -r exec -- npm version 0.3.0-beta.1 --no-git-tag-version
 
 # Publish with beta tag (users won't get it on `npm install` by default)
 cd packages/core && pnpm publish --access public --tag beta && cd ../..

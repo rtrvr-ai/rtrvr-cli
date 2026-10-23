@@ -163,3 +163,24 @@ const result = await client.run({
 - Request/response types: `UnifiedRunRequest`, `UnifiedRunResponse`, `UnifiedScrapeRequest`, etc.
 - Helper types: `CloudFile`, `WebhookSubscription`, `WebhookAuth`, `DeviceInfo`, `RunMetadata`
 - All type exports from core
+
+## 0.3.0 run behavior
+
+Cloud agent and scrape calls send a generated or caller-supplied `trajectoryId` as `Idempotency-Key`. Retries reuse it. HTTP 429/503 `Retry-After` delays share the call deadline. SDK callers recovering across separate calls should reuse the same id and body; legacy servers may return 409 instead of replaying a result.
+
+The client sends `Prefer: respond-async`. HTTP 202 follows the MCP events relay with `since` resume after stream ends or drops, then retrieves the complete final response. HTTP 200 keeps the existing final response behavior. The default wait covers 45 minutes; an explicit SDK `timeoutMs` bounds the whole call. The server owns the run limit.
+
+Errors expose `RtrvrError.code`, `.fields`, `.requestId` and `.details`, including retained partial results. See [the operations guide](../../docs/CLI_OPERATIONS.md) for endpoint and cancellation details.
+
+```ts
+const controller = new AbortController();
+const result = await client.run({
+  input: 'Summarize the page',
+  target: 'cloud',
+  signal: controller.signal,
+  onEvent: (event) => console.error(event.event),
+});
+// Calling controller.abort() while awaiting requests cloud cancellation.
+```
+
+Async `onEvent` observers run sequentially. The second argument is the run's AbortSignal; pass it to observer I/O so cancellation can stop pending work. `includeEventOutput: false` follows status without tool output and still returns the complete final response. Both controls stay off the API request body.

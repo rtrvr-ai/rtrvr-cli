@@ -1,12 +1,16 @@
+import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_CLOUD_BASE_URL,
   DEFAULT_CONTROL_BASE_URL,
   DEFAULT_MCP_BASE_URL,
   TOOL_NAME_ALIASES,
   TOOL_NAMES,
+  DEFAULT_TIMEOUT_MS,
 } from './constants.js';
-import { isNoDeviceError, isSupportedAuthToken, RtrvrError } from './errors.js';
+import { isNoDeviceError, isSupportedAuthToken, RtrvrError, serverErrorFromPayload } from './errors.js';
 import { HttpClient } from './http.js';
+import { createDeadline } from './deadline.js';
+import { streamExecutionEvents, record, type StreamExecutionEvent } from './events.js';
 import {
   AgentRequest,
   CliCapabilitiesResponse,
@@ -15,6 +19,7 @@ import {
   CloudFile,
   DeviceListResult,
   ExtensionPlannerRequest,
+  ExecutionControls,
   RunMode,
   ScrapeRequest,
   ToolRequest,
@@ -29,6 +34,8 @@ interface DirectApiResponse<T = unknown> {
   data?: T;
   error?: {
     message?: string;
+    code?: string;
+    fields?: unknown;
     details?: unknown;
   };
   metadata?: {
@@ -42,6 +49,8 @@ interface DirectApiResponse<T = unknown> {
 
 export class RtrvrClient {
   private readonly http: HttpClient;
+  private readonly timeoutMs: number;
+  private readonly fetchImpl: typeof fetch;
   private readonly cloudBaseUrl: string;
   private readonly mcpBaseUrl: string;
   private readonly controlBaseUrl: string;
@@ -54,6 +63,8 @@ export class RtrvrClient {
       throw new RtrvrError('A valid rtrvr auth token is required (rtrvr_... or mcp_at_...).');
     }
     this.authToken = options.apiKey;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.fetchImpl = options.fetchImpl ?? fetch;
 
     this.http = new HttpClient({
       apiKey: options.apiKey,
@@ -77,25 +88,91 @@ export class RtrvrClient {
       throw new RtrvrError('`input` is required for agent runs.');
     }
 
-    return this.http.requestJson<unknown>({
-      url: `${this.cloudBaseUrl}/agent`,
-      method: 'POST',
-      body: request,
-    });
+    return this.cloudRun('agent', request);
   }
 
   async scrapeRun(request: ScrapeRequest): Promise<unknown> {
     this.assertCloudApiKey('Cloud /scrape');
+    if (!request.urls || request.urls.length === 0) throw new RtrvrError('`urls` is required for scrape runs.');
+    return this.cloudRun('scrape', request);
+  }
 
-    if (!request.urls || request.urls.length === 0) {
-      throw new RtrvrError('`urls` is required for scrape runs.');
+  private async cloudRun(kind: 'agent' | 'scrape', request: AgentRequest | ScrapeRequest): Promise<unknown> {
+    const { signal, onEvent, includeEventOutput, target: _target, preferExtension: _preferExtension,
+      requireLocalSession: _requireLocalSession, deviceId: _deviceId, ...wire } = request as (AgentRequest | ScrapeRequest) & {
+        target?: RunMode; preferExtension?: boolean; requireLocalSession?: boolean; deviceId?: string;
+      };
+    const trajectoryId = request.trajectoryId ?? randomUUID();
+    const deadline = createDeadline(this.timeoutMs, signal);
+    let progressAbort = new AbortController();
+    let executionId = trajectoryId;
+    const onAbort = () => progressAbort.abort(deadline.signal.reason);
+    deadline.signal.addEventListener('abort', onAbort, { once: true });
+    let follower: Promise<{ terminal?: StreamExecutionEvent; error?: unknown }> | undefined;
+    const follow = (): Promise<{ terminal?: StreamExecutionEvent; error?: unknown }> => follower ??= streamExecutionEvents({
+      baseUrl: this.mcpBaseUrl, token: this.authToken, trajectoryId: executionId,
+      phase: 'phase' in request ? request.phase : 1,
+      includeOutput: includeEventOutput ?? true, signal: progressAbort.signal, timeoutMs: deadline.remaining(), fetchImpl: this.fetchImpl,
+      onEvent: onEvent ?? (() => undefined),
+    }).then(terminal => ({ terminal }), error => ({ error }));
+    let posted = false;
+    let partialResult: unknown;
+    try {
+      deadline.signal.throwIfAborted();
+      // Legacy clouds can stream progress while their advisory preference is ignored.
+      if (onEvent) follow();
+      let status = 200;
+      posted = true;
+      const admitted = await this.http.requestJson<unknown>({
+        url: `${this.cloudBaseUrl}/${kind}`, method: 'POST',
+        headers: { 'Idempotency-Key': trajectoryId, Prefer: 'respond-async' },
+        body: { ...wire, trajectoryId, ...(onEvent ? { options: { ...record(wire.options), ui: { ...record(record(wire.options).ui), emitEvents: true } } } : {}) },
+        signal: deadline.signal, timeoutMs: deadline.remaining(),
+        onResponse: response => { status = response.status; },
+      });
+      if (status !== 202) return admitted;
+      partialResult = admitted;
+      const handle = record(admitted);
+      const id = handle.trajectoryId ?? handle.runId;
+      if (typeof id !== 'string' || !id) throw new RtrvrError('Async admission did not return a run id.', { code: 'ASYNC_RUN_ID_MISSING', details: admitted });
+      if (id !== executionId) {
+        progressAbort.abort();
+        if (follower) await follower;
+        progressAbort = new AbortController();
+        follower = undefined;
+        executionId = id;
+      }
+      deadline.signal.throwIfAborted();
+      const completed = await follow();
+      if (completed.error) throw completed.error;
+      partialResult = record(completed.terminal?.data).data ?? completed.terminal?.data ?? admitted;
+      // The relay deliberately clips output. Read the full authorized response after its terminal event.
+      const statusUrl = typeof handle.statusUrl === 'string' ? handle.statusUrl : `/${kind}/${encodeURIComponent(executionId)}`;
+      const resultUrl = new URL(statusUrl, `${this.cloudBaseUrl}/`);
+      if (resultUrl.origin !== new URL(this.cloudBaseUrl).origin) throw new RtrvrError('Async statusUrl must use the cloud origin.', { code: 'INVALID_ASYNC_STATUS_URL' });
+      resultUrl.pathname = resultUrl.pathname.endsWith('/response') ? resultUrl.pathname : `${resultUrl.pathname}/response`;
+      return await this.http.requestJson<unknown>({ url: resultUrl.toString(), method: 'GET', signal: deadline.signal, timeoutMs: deadline.remaining() });
+    } catch (error) {
+      if (signal?.aborted && posted) {
+        // Cancellation has its own physical wall-clock envelope after the run wait is aborted.
+        try { await this.http.requestJson({ url: `${this.cloudBaseUrl}/${kind === 'agent' ? 'agent' : 'scrape'}/cancel`, method: 'POST', body: { trajectoryId: executionId }, timeoutMs: 10_000 }); }
+        catch (cancelError) { throw new RtrvrError('Cancellation was not acknowledged within its wait budget.', { code: 'CANCEL_UNCONFIRMED', cause: cancelError, details: { trajectoryId: executionId, partialResult: { cancelRequested: true } } }); }
+      }
+      const failure = deadline.signal.aborted ? deadline.signal.reason : error;
+      if (partialResult !== undefined) throw new RtrvrError(failure instanceof Error ? failure.message : 'Run follow failed.', {
+        code: failure instanceof RtrvrError ? failure.code : 'RUN_FOLLOW_FAILED',
+        status: failure instanceof RtrvrError ? failure.status : undefined,
+        fields: failure instanceof RtrvrError ? failure.fields : undefined,
+        requestId: failure instanceof RtrvrError ? failure.requestId : undefined,
+        details: { trajectoryId: executionId, partialResult: failure instanceof RtrvrError ? record(failure.details).partialResult ?? partialResult : partialResult, failure: failure instanceof RtrvrError ? failure.details : undefined }, cause: failure,
+      });
+      throw failure;
+    } finally {
+      progressAbort.abort();
+      if (follower) await follower;
+      deadline.signal.removeEventListener('abort', onAbort);
+      deadline.dispose();
     }
-
-    return this.http.requestJson<unknown>({
-      url: `${this.cloudBaseUrl}/scrape`,
-      method: 'POST',
-      body: request,
-    });
   }
 
   async scrape(request: UnifiedScrapeRequest): Promise<UnifiedScrapeResponse> {
@@ -142,7 +219,7 @@ export class RtrvrClient {
     if (requireLocalSession || explicitDeviceSelection) {
       let devices: DeviceListResult | undefined;
       if (!explicitDeviceSelection) {
-        devices = await this.listDevices();
+        devices = await this.listDevices(request.signal);
         if (!devices.online) {
           throw new RtrvrError(
             'No online extension devices found, but this scrape requires local browser session.',
@@ -173,7 +250,7 @@ export class RtrvrClient {
     }
 
     // Auto mode: check for online extension devices, use if available, fall back to cloud
-    const devices = await this.listDevices();
+    const devices = await this.listDevices(request.signal);
     if (devices.online) {
       try {
         const routed = await this.extensionScrapeRun(request);
@@ -220,18 +297,23 @@ export class RtrvrClient {
   }
 
   private async extensionPlannerRunWithMetadata(request: ExtensionPlannerRequest): Promise<ToolRunWithMetadata> {
-    return this.toolRunWithMetadata({
+    return this.observeMcpRun(request, request.params?.trajectoryId, request.params?.phase, () => this.toolRunWithMetadata({
       tool: TOOL_NAMES.PLANNER,
-      params: {
-        user_input: request.input,
-        tab_urls: request.urls,
-        schema: request.schema,
-        file_urls: request.fileUrls,
-        ...(request.params ?? {}),
-        ...(request.clientSurface ? { client_surface: request.clientSurface } : {}),
-      },
-      deviceId: request.deviceId,
-    });
+      params: { user_input: request.input, tab_urls: request.urls, schema: request.schema, file_urls: request.fileUrls,
+        ...(request.params ?? {}), ...(request.clientSurface ? { client_surface: request.clientSurface } : {}) },
+      deviceId: request.deviceId, signal: request.signal,
+    }));
+  }
+
+  private async observeMcpRun<T>(request: ExecutionControls, trajectoryId: unknown, phase: unknown, execute: () => Promise<T>): Promise<T> {
+    const controller = new AbortController();
+    const progress = request.onEvent && typeof trajectoryId === 'string'
+      ? streamExecutionEvents({ baseUrl: this.mcpBaseUrl, token: this.authToken,
+        trajectoryId, phase: typeof phase === 'number' ? phase : 1,
+        includeOutput: request.includeEventOutput ?? true, signal: controller.signal, timeoutMs: this.timeoutMs, fetchImpl: this.fetchImpl, onEvent: request.onEvent,
+      }).catch(() => undefined) : undefined;
+    try { return await execute(); }
+    finally { controller.abort(); await progress; }
   }
 
   async toolRun(request: ToolRequest): Promise<unknown> {
@@ -253,11 +335,12 @@ export class RtrvrClient {
       url: this.mcpBaseUrl,
       method: 'POST',
       body: payload,
+      signal: request.signal,
     });
 
     if (!response.success) {
-      throw new RtrvrError(response.error?.message ?? `Tool '${tool}' failed`, {
-        details: response,
+      throw serverErrorFromPayload(response, {
+        requestId: response.metadata?.requestId, fallbackMessage: `Tool '${tool}' failed`,
       });
     }
 
@@ -273,10 +356,11 @@ export class RtrvrClient {
     };
   }
 
-  async listDevices(): Promise<DeviceListResult> {
+  async listDevices(signal?: AbortSignal): Promise<DeviceListResult> {
     const data = await this.toolRun({
       tool: TOOL_NAMES.LIST_DEVICES,
       params: {},
+      signal,
     });
 
     const normalized = normalizeDeviceList(data);
@@ -351,7 +435,7 @@ export class RtrvrClient {
     if (requireLocalSession || explicitDeviceSelection) {
       let devices: DeviceListResult | undefined;
       if (!explicitDeviceSelection) {
-        devices = await this.listDevices();
+        devices = await this.listDevices(request.signal);
         if (!devices.online) {
           throw new RtrvrError(
             'No online extension devices found, but this run requires local browser session.',
@@ -375,7 +459,7 @@ export class RtrvrClient {
     }
 
     // Auto mode: check for online extension devices, use if available, fall back to cloud
-    const devices = await this.listDevices();
+    const devices = await this.listDevices(request.signal);
     if (devices.online) {
       try {
         const routed = await this.extensionPlannerRunWithMetadata(toExtensionPlannerRequest(request));
@@ -433,11 +517,12 @@ export class RtrvrClient {
       requireLocalSession: request.requireLocalSession,
     };
 
-    const routed = await this.toolRunWithMetadata({
+    const routed = await this.observeMcpRun(request, request.trajectoryId, 1, () => this.toolRunWithMetadata({
       tool: TOOL_NAMES.SCRAPE,
       params,
       deviceId: request.deviceId,
-    });
+      signal: request.signal,
+    }));
     if (routed.tool === TOOL_NAMES.CLOUD_SCRAPE) {
       return {
         data: routed.data,
@@ -515,6 +600,9 @@ function toAgentRequest(request: UnifiedRunRequest): AgentRequest {
 
   return {
     input: request.input,
+    signal: request.signal,
+    onEvent: request.onEvent,
+    includeEventOutput: request.includeEventOutput,
     clientSurface: request.clientSurface,
     urls: request.urls,
     schema: request.schema,
@@ -565,6 +653,9 @@ function toExtensionPlannerRequest(request: UnifiedRunRequest): ExtensionPlanner
 
   return {
     input: request.input,
+    signal: request.signal,
+    onEvent: request.onEvent,
+    includeEventOutput: request.includeEventOutput,
     urls: request.urls,
     schema: request.schema,
     fileUrls: explicitFileUrls.length > 0 ? explicitFileUrls : derivedFileUrls,

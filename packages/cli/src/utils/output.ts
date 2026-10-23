@@ -1,3 +1,6 @@
+import { once } from 'node:events';
+import type { Writable } from 'node:stream';
+
 export function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
@@ -166,4 +169,23 @@ function extractErrorMessage(value: unknown): string | undefined {
     return (asErr.error as Record<string, string>).message;
   }
   return undefined;
+}
+
+// Abort/deadline completion cannot wait forever for a pipe that stopped reading.
+export function exitAfterAbort(code: number): void {
+  process.exitCode = code;
+  setImmediate(() => process.exit(code));
+}
+
+export function writeProgress(stream: Writable, text: string, signal: AbortSignal): void | Promise<unknown> {
+  signal.throwIfAborted();
+  if (!stream.write(text)) return once(stream, 'drain', { signal });
+}
+
+export function finalRunExitCode(value: unknown): 0 | 1 {
+  const root = asRecord(value);
+  const result = asRecord(root?.data) ?? root;
+  if (!result) return 0;
+  const statuses = [result.status, asRecord(result.run)?.state, asRecord(result.terminalResult)?.status];
+  return statuses.some(status => status === 'error' || status === 'failed' || status === 'cancelled') ? 1 : 0;
 }

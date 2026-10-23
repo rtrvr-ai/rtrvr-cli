@@ -1,5 +1,6 @@
 import { DEFAULT_TIMEOUT_MS } from './constants.js';
-import { RtrvrError } from './errors.js';
+import { RtrvrError, serverErrorFromPayload, serverRequestId } from './errors.js';
+import { createDeadline, retryAfterMs, wait } from './deadline.js';
 import type { RetryPolicy } from './types.js';
 
 export interface HttpClientOptions {
@@ -16,6 +17,8 @@ export interface JsonRequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   headers?: Record<string, string>;
+  timeoutMs?: number;
+  onResponse?: (response: Response) => void;
 }
 
 export class HttpClient {
@@ -39,63 +42,63 @@ export class HttpClient {
   }
 
   async requestJson<T>(options: JsonRequestOptions): Promise<T> {
+    const deadline = createDeadline(options.timeoutMs ?? this.timeoutMs, options.signal);
+    const request = { ...options, signal: deadline.signal };
     let attempt = 0;
-
-    while (attempt < this.retryPolicy.maxAttempts) {
-      attempt += 1;
-
-      try {
-        return await this.requestOnce<T>(options, attempt);
-      } catch (error) {
-        if (!(error instanceof RtrvrError)) {
-          throw error;
+    try {
+      deadline.signal.throwIfAborted();
+      let serializedBody: string | undefined;
+      try { serializedBody = options.body === undefined ? undefined : JSON.stringify(options.body); }
+      catch (cause) { throw new RtrvrError('Request body could not be encoded as JSON.', { code: 'INVALID_REQUEST_BODY', cause }); }
+      while (attempt < this.retryPolicy.maxAttempts) {
+        if (deadline.remaining() <= 0) throw new RtrvrError('Request deadline exceeded.', { code: 'REQUEST_DEADLINE' });
+        deadline.signal.throwIfAborted();
+        attempt += 1;
+        try {
+          return await this.requestOnce<T>(request, attempt, serializedBody);
+        } catch (error) {
+          if (!(error instanceof RtrvrError) || !shouldRetry(error, attempt, this.retryPolicy, deadline.signal)) throw error;
+          const delay = Math.max(backoffDelayMs(attempt, this.retryPolicy), error.retryAfterMs ?? 0);
+          if (delay >= deadline.remaining()) {
+            throw new RtrvrError('Retry delay exceeds the request deadline.', { code: 'REQUEST_DEADLINE', requestId: error.requestId, fields: error.fields, details: error.details, cause: error });
+          }
+          await wait(delay, deadline.signal);
         }
-
-        if (!shouldRetry(error, attempt, this.retryPolicy, options.signal)) {
-          throw error;
-        }
-
-        await sleep(backoffDelayMs(attempt, this.retryPolicy));
       }
+      throw new RtrvrError('Request failed after retries were exhausted.');
+    } finally {
+      deadline.dispose();
     }
-
-    throw new RtrvrError('Request failed after retries were exhausted.');
   }
 
-  private async requestOnce<T>(options: JsonRequestOptions, attempt: number): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(new Error('Request timed out')), this.timeoutMs);
-    const signal = options.signal ?? controller.signal;
-
+  private async requestOnce<T>(options: JsonRequestOptions, attempt: number, serializedBody: string | undefined): Promise<T> {
     try {
+      const headers = new Headers({ Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' });
+      for (const [key, value] of Object.entries(this.defaultHeaders)) headers.set(key, value);
+      for (const [key, value] of Object.entries(options.headers ?? {})) headers.set(key, value);
       const response = await this.fetchImpl(options.url, {
         method: options.method ?? 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-          ...this.defaultHeaders,
-          ...options.headers,
-        },
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
-        signal,
+        headers,
+        body: serializedBody,
+        signal: options.signal,
       });
 
-      const requestId = response.headers.get('x-request-id') ?? undefined;
+      const headerRequestId = response.headers.get('x-request-id') ?? undefined;
       const text = await response.text();
 
       const payload = text.length > 0
         ? parseJsonSafely(text)
         : undefined;
 
+      const requestId = serverRequestId(payload, headerRequestId);
       if (!response.ok) {
-        const message = extractErrorMessage(payload) ?? `HTTP ${response.status}`;
-        throw new RtrvrError(message, {
-          status: response.status,
-          requestId,
-          details: payload,
+        throw serverErrorFromPayload(payload, {
+          status: response.status, requestId,
+          retryAfterMs: response.status === 429 || response.status === 503 ? retryAfterMs(response.headers.get('retry-after')) : undefined,
         });
       }
 
+      options.onResponse?.(response);
       return enrichPayloadMetadata(payload, requestId, attempt) as T;
     } catch (error) {
       if (error instanceof RtrvrError) {
@@ -107,8 +110,6 @@ export class HttpClient {
         `${baseMsg} (url: ${options.url})`,
         { cause: error },
       );
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }
@@ -119,7 +120,7 @@ function normalizeRetryPolicy(policy: RetryPolicy | undefined): {
   maxDelayMs: number;
   retriableStatusCodes: number[];
 } {
-  const maxAttempts = Math.max(1, Math.min(10, Math.floor(policy?.maxAttempts ?? 1)));
+  const maxAttempts = Math.max(1, Math.floor(policy?.maxAttempts ?? 1));
   const baseDelayMs = Math.max(25, Math.floor(policy?.baseDelayMs ?? 250));
   const maxDelayMs = Math.max(baseDelayMs, Math.floor(policy?.maxDelayMs ?? 4_000));
   const retriableStatusCodes = Array.isArray(policy?.retriableStatusCodes) && policy.retriableStatusCodes.length > 0
@@ -164,10 +165,6 @@ function backoffDelayMs(
   return Math.min(policy.maxDelayMs, exponential + jitter);
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function enrichPayloadMetadata(payload: unknown, requestId: string | undefined, attempt: number): unknown {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return payload;
@@ -198,38 +195,4 @@ function parseJsonSafely(text: string): unknown {
       raw: text,
     };
   }
-}
-
-function extractErrorMessage(payload: unknown): string | undefined {
-  if (payload === null || payload === undefined) {
-    return undefined;
-  }
-
-  if (typeof payload === 'string') {
-    return payload;
-  }
-
-  if (typeof payload !== 'object') {
-    return undefined;
-  }
-
-  const asRecord = payload as Record<string, unknown>;
-
-  if (typeof asRecord.message === 'string') {
-    return asRecord.message;
-  }
-
-  if (
-    typeof asRecord.error === 'object' &&
-    asRecord.error !== null &&
-    typeof (asRecord.error as Record<string, unknown>).message === 'string'
-  ) {
-    return (asRecord.error as Record<string, string>).message;
-  }
-
-  if (typeof asRecord.error === 'string') {
-    return asRecord.error;
-  }
-
-  return undefined;
 }

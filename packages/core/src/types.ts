@@ -1,3 +1,5 @@
+import type { StreamExecutionEvent } from './events.js';
+
 export type RunMode = 'auto' | 'cloud' | 'extension';
 
 export interface CloudFile {
@@ -26,7 +28,16 @@ export interface WebhookSubscription {
   secret?: string;
 }
 
-export interface AgentRequest {
+export interface ExecutionControls {
+  /** Include tool output in progress events; the full final response is unaffected. */
+  includeEventOutput?: boolean;
+  /** Aborting explicitly cancels a cloud run, with a bounded acknowledgement wait. */
+  signal?: AbortSignal;
+  /** Observers run sequentially; a returned promise shares the run's abort/deadline. */
+  onEvent?: (event: StreamExecutionEvent, signal: AbortSignal) => unknown;
+}
+
+export interface AgentRequest extends ExecutionControls {
   input: string;
   /** Analytics-only product origin. It never changes authorization or routing. */
   clientSurface?: 'cli';
@@ -48,7 +59,7 @@ export interface AgentRequest {
   authToken?: string;
 }
 
-export interface ScrapeRequest {
+export interface ScrapeRequest extends ExecutionControls {
   urls: string[];
   settings?: Record<string, unknown>;
   options?: Record<string, unknown>;
@@ -67,7 +78,7 @@ export interface UnifiedScrapeRequest extends ScrapeRequest {
   deviceId?: string;
 }
 
-export interface ExtensionPlannerRequest {
+export interface ExtensionPlannerRequest extends ExecutionControls {
   input: string;
   /** Analytics-only product origin. It never changes authorization or routing. */
   clientSurface?: 'cli';
@@ -79,12 +90,13 @@ export interface ExtensionPlannerRequest {
 }
 
 export interface ToolRequest {
+  signal?: AbortSignal;
   tool: string;
   params?: Record<string, unknown>;
   deviceId?: string;
 }
 
-export interface UnifiedRunRequest {
+export interface UnifiedRunRequest extends ExecutionControls {
   input: string;
   /** Analytics-only product origin. It never changes authorization or routing. */
   clientSurface?: 'cli';

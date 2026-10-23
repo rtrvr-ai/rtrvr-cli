@@ -2,7 +2,7 @@ export const DEFAULT_CLOUD_BASE_URL = 'https://api.rtrvr.ai';
 export const DEFAULT_MCP_BASE_URL = 'https://mcp.rtrvr.ai';
 export const DEFAULT_CONTROL_BASE_URL = 'https://cli.rtrvr.ai';
 
-export const DEFAULT_TIMEOUT_MS = 9 * 60 * 1000;
+export const DEFAULT_TIMEOUT_MS = 45 * 60 * 1000;
 
 export const TOOL_NAMES = {
   PLANNER: 'planner',

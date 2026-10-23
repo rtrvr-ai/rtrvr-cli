@@ -66,10 +66,26 @@ rtrvr scrape --url https://example.com --target auto
 
 - Execution events are opt-in via `options.ui.emitEvents=true`.
 - `rtrvr run` / `rtrvr agent` / `rtrvr scrape` stream by default and auto-enable `emitEvents` for that request.
-- `--no-stream` disables SSE and CLI does not force `emitEvents` (cloud + extension).
+- `--no-stream` hides progress and does not force `emitEvents`. HTTP 202 runs still follow events to completion.
 - `--no-stream-output` keeps live status events while suppressing streamed output payloads.
 - Payloads `<=1MB` remain inline in `output`/`result`; larger payloads keep inline preview markers plus ref fields (`outputRef` / `resultRef` / `responseRef`).
 - Refs are additive: preview stays in `output`/`result`, and full content is downloaded via the ref URL/path.
+
+## Run admission, deadlines and cancellation
+
+Cloud `/agent` and `/scrape` send `Idempotency-Key` equal to `trajectoryId`. An omitted id is generated once per call, before retries, including `--no-stream` calls. Retry the same body and id when recovering an admission whose response was lost. A legacy server may answer 409 on a reused id; the client preserves that refusal and never invents a new identity to bypass it.
+
+The client requests `Prefer: respond-async`. On HTTP 202 it follows `/cli/executions/:id/events` on the configured MCP base URL, with `includeOutput=1` internally. This is the API-key route on both clouds. EOF, network drops and temporary stream refusals reconnect from the last durable sequence. The gateway's proposed public `/agent/:id/events` route is not used.
+
+On termination, the client reads the full response from the cloud run's `statusUrl` plus `/response`, using the same origin and credentials. Stream previews do not replace the full response. HTTP 200 returns the server's final result directly, including servers that ignore the preference.
+
+The default client wait covers the server's 45 minute maximum run window. SDK `timeoutMs` bounds the entire call, including admission, retry delays, event following and final response retrieval. The server enforces its own run limits. A stream drop never posts another run or sends cancel.
+
+Progress observers run sequentially, and stdout/stderr writes wait for drain under the run abort signal. SDK observers may return promises and receive that signal as their second argument. `includeEventOutput: false` is a client control for status-only events. The CLI uses it for `--no-stream-output` and `--no-stream`. Abort/deadline completion does not wait indefinitely for a blocked output pipe.
+
+Ctrl-C sends `/agent/cancel` for an agent run, or `/scrape/cancel` for a scrape, with `{trajectoryId}`. The CLI exits with code 130 after acknowledgement or a 10 second cancellation wait. A cancellation that is not acknowledged reports `CANCEL_UNCONFIRMED` and retains the run id.
+
+HTTP 429 and 503 honor `Retry-After` in seconds or HTTP-date form. A delay that cannot fit within the caller's remaining deadline stops with `REQUEST_DEADLINE` before another request starts. Stream frame buffers have a one MiB UTF-8 byte envelope. Oversized or unterminated output frames emit `SSE_EVENT_TOO_LARGE` as a typed repair with measured bytes and resume from the same cursor without streamed output. The full final response stays intact. A status-only stream that still breaches the envelope reports the repair and run handle.
 
 ## Skills runbook
 
@@ -130,3 +146,5 @@ rtrvr run --input "task" --url https://example.com --json
 ```
 
 Use `metadata.requestId` and `metadata.attempt` for traceability.
+
+Errors preserve server `code`, offending `fields` and `requestId`. Include these when reporting a failed request. A retained partial result is printed with the error.

@@ -133,7 +133,7 @@ Key flags for `run` / `agent`:
 
 **Output options:**
 - `--json` - machine-readable JSON output
-- `--no-stream` - disable SSE progress streaming
+- `--no-stream` - hide progress; async completion still follows events
 - `--no-stream-output` - hide tool output payloads in stream events
 
 **Scrape options:**
@@ -199,3 +199,15 @@ rtrvr config set controlBaseUrl https://cli.rtrvr.ai
 rtrvr config set oauthPollIntervalMs 2000          # OAuth poll interval
 rtrvr config set oauthTimeoutMs 300000             # OAuth timeout (5 min)
 ```
+
+## 0.3.0 run behavior
+
+Cloud agent and scrape calls send a generated or caller-supplied `trajectoryId` as `Idempotency-Key`. Retries reuse it. HTTP 429/503 `Retry-After` delays share the call deadline. SDK callers recovering across separate calls should reuse the same id and body; legacy servers may return 409 instead of replaying a result.
+
+The client sends `Prefer: respond-async`. HTTP 202 follows the MCP events relay with `since` resume after stream ends or drops, then retrieves the complete final response. HTTP 200 keeps the existing final response behavior. The default wait covers 45 minutes; an explicit SDK `timeoutMs` bounds the whole call. The server owns the run limit.
+
+Errors expose `RtrvrError.code`, `.fields`, `.requestId` and `.details`, including retained partial results. See [the operations guide](../../docs/CLI_OPERATIONS.md) for endpoint and cancellation details.
+
+`--no-stream` hides progress while async completion still follows events. Ctrl-C requests cancel, waits up to 10 seconds for acknowledgement, then exits 130.
+
+Progress waits for a slow stdout/stderr pipe to drain. `--no-stream-output` requests status without tool output. Oversized progress frames trigger a typed repair to status only; the final result stays complete. Abort/deadline completion exits without waiting forever for a blocked pipe.
